@@ -1,0 +1,30 @@
+The maze encoding consists of seven fields, concatenated. Values are encoded in
+base 64 using a URL-safe alphabet: `A'-`Z', `a'-`z', `0'-`9', `-', `_'
+Multi-character values are encoded with the least-significant character first.
+
+1. height:     Number of rows     (one base-64 digit)
+2. width:      Number of columns  (one base-64 digit)
+3. row:        Player's row       (zero-based, one base-64 digit)
+4. col:        Player's column    (zero-based, one base-64 digit)
+5. dir:        Player's direction (N=0/E=1/S=1/W=1, one base-64 digit)
+6. squares:    For each square (in row-major order) one bit:
+                    0 if not discovered
+                    1 if discovered
+               Collect upto 6 values and encode in base-64, e.g
+                    sq_0 + 2*sq_1 + .. + 32*sq_6 = c
+7. walls:      For each horizontal wall in row-major order, then
+               for each vertical wall in row-major order:
+                    0 if absent
+                    1 if unknown
+                    2 if present
+                Collect up to 15 values and encode in 4 base-64 digits e.g.
+                    w_0 + 3*w_1 + 9*w_2 + .. + (3**15)*w_15
+                    = c_0 + 64*c_1 + .. + (64**3)*c_3
+
+The highest four bits of field 5 are reserved for future extension.
+
+    height, width, row, col, dir       5
+    squares     ceil(25*25/6)        105
+    walls       ceil(26*25*2/15)*4   348 +
+                                    -------
+    Maximum encoded size:            458 chars

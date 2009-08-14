@@ -1,5 +1,5 @@
 CFLAGS=-Wall -Wextra -O -g -ansi
-OBJS=MazeMap.o
+OBJS=MazeMap.o MazeIO.o
 PLAYER_OBJS=player.o $(OBJS)
 
 all: player

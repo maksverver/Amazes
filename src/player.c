@@ -23,14 +23,18 @@ const char *next_line()
 int main()
 {
     mm_clear(&mm);
+    printf("%s\n", mm_encode(&mm));
     mm_look(&mm, "W", FRONT);
     mm_look(&mm, "W", RIGHT);
     mm_look(&mm, "LLBNW", BACK);
     mm_look(&mm, "W", LEFT);
     mm_print(&mm, stdout); fputc('\n', stdout);
+    printf("%s\n", mm_encode(&mm));
     mm_infer(&mm);
     mm_print(&mm, stdout); fputc('\n', stdout);
+    printf("%s\n", mm_encode(&mm));
     mm_move(&mm, "TL");
     mm_print(&mm, stdout); fputc('\n', stdout);
+    printf("%s\n", mm_encode(&mm));
     return 0;
 }

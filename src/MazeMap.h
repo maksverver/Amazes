@@ -59,6 +59,5 @@ extern void mm_infer(MazeMap *mm);
 extern void mm_move(MazeMap *mm, const char *move);
 extern int  mm_get_wall(MazeMap *mm, int r, int c, Dir dir);
 extern void mm_set_wall(MazeMap *mm, int r, int c, Dir dir, int val);
-extern void mm_print(MazeMap *mm, FILE *fp);
 
 #endif /* ndef MAZE_MAP_H */
