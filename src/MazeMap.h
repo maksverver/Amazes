@@ -29,7 +29,7 @@ typedef enum RelDir  { FRONT = 0, RIGHT = 1, BACK = 2, LEFT = 3 } RelDir;
 
 typedef struct MazeCell
 {
-    signed char square : 2, wall_e : 2, wall_n : 2;
+    signed char square : 2, wall_w : 2, wall_n : 2;
 } MazeCell;
 
 typedef struct Point

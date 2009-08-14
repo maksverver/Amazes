@@ -14,7 +14,7 @@ int mm_get_wall(MazeMap *mm, int r, int c, Dir dir)
     }
     else  /* east/west */
     {
-        return mm->grid[r][(dir == EAST) ? (c + 1)%25 : c].wall_e;
+        return mm->grid[r][(dir == WEST) ? c : (c + 1)%25].wall_w;
     }
 }
 
@@ -26,7 +26,7 @@ void mm_set_wall(MazeMap *mm, int r, int c, Dir dir, int val)
     }
     else  /* east/west */
     {
-        mm->grid[r][(dir == EAST) ? (c + 1)%25 : c].wall_e = val;
+        mm->grid[r][(dir == WEST) ? c : (c + 1)%25].wall_w = val;
     }
 }
 
@@ -150,45 +150,99 @@ void mm_move(MazeMap *mm, const char *move)
 
 void mm_infer(MazeMap *mm)
 {
-    /* A square that you have not yet discovered, but for which you have
-       discovered three of its walls, is also discovered. This square is called
-       a 'dead-end'-square. The opening from this square to the next square is
-       also discovered.
+    bool changed;
+    do {
+        changed = false;
 
-       A square that has one discovered opening to a 'dead-end'-square and two
-       discovered walls is also discovered. This square is also called a
-       'dead-end'-square. Now both openings are discovered.
+        /* A square that you have not yet discovered, but for which you have
+           discovered three of its walls, is also discovered. This square is
+           called a 'dead-end'-square. The opening from this square to the
+           next square is also discovered.
 
-       A square that has two discovered openings to 'dead-end'-squares and has
-       one discovered wall is also discovered. This square is also called a
-       'dead-end'-square. The three openings from this square are also
-       discovered.
+           A square that has one discovered opening to a 'dead-end'-square and
+           two discovered walls is also discovered. This square is also called
+           a 'dead-end'-square. Now both openings are discovered.
 
-       A square that has three discovered openings to 'dead-end'-squares is also
-       discovered. This square is also called a 'dead-end'-square. All four
-       openings for this square are discovered.
-    */
-    /* TODO */
+           A square that has two discovered openings to 'dead-end'-squares and
+           has one discovered wall is also discovered. This square is also
+           called a 'dead-end'-square. The three openings from this square are
+           also discovered.
 
-    /* Discovery of walls */
+           A square that has three discovered openings to 'dead-end'-squares is
+           also discovered. This square is also called a 'dead-end'-square. All
+           four openings for this square are discovered.
+        */
+        /* TODO */
 
-    /* If for a corner in the maze you have discovered that three edges are
-      openings, the fourth edge has to be a wall and is discovered. */
-    /* TODO */
+        /* Discovery of walls */
 
-    /* If you have discovered, or know of open connections to, at least one
-       square in all 25 columns of the maze, the vertical walls on the outside
-       (the outer edges of the maze) are discovered. */
-    /* TODO */
+        /* If for a corner in the maze you have discovered that three edges are
+           openings, the fourth edge has to be a wall and is discovered. */
+        {
+            int r, c;
+            for (r = 0; r < HEIGHT; ++r)
+            {
+                for (c = 0; c < WIDTH; ++c)
+                {
+                    int n, e, s, w, na, nu;
+                    n = mm->grid[r    ][c + 1].wall_w;
+                    e = mm->grid[r + 1][c + 1].wall_n;
+                    s = mm->grid[r + 1][c + 1].wall_w;
+                    w = mm->grid[r + 1][c    ].wall_n;
+                    na = 0;
+                    if (n == ABSENT) ++na;
+                    if (e == ABSENT) ++na;
+                    if (s == ABSENT) ++na;
+                    if (w == ABSENT) ++na;
+                    nu = 0;
+                    assert(na <= 3);
+                    if (na == 3)
+                    {
+                        if (n == UNKNOWN)
+                        {
+                            mm->grid[r    ][c + 1].wall_w = PRESENT;
+                            changed = true;
+                        }
+                        else
+                        if (e == UNKNOWN)
+                        {
+                            mm->grid[r + 1][c + 1].wall_n = PRESENT;
+                            changed = true;
+                        }
+                        else
+                        if (s == UNKNOWN)
+                        {
+                            mm->grid[r + 1][c + 1].wall_w = PRESENT;
+                            changed = true;
+                        }
+                        else
+                        if (w == UNKNOWN)
+                        {
+                            mm->grid[r + 1][c    ].wall_n = PRESENT;
+                            changed = true;
+                        }
+                    }
+                }
+            }
+            printf("%d\n", changed);
+        }
+        /* TODO */
 
-    /* If you have discovered, or know of open connections to, at least one
-       square in all 25 rows of the maze, the horizontal walls on the outside
-       (the outer edges of the maze) are discovered. */
-    /* TODO */
+        /* If you have discovered, or know of open connections to, at least one
+           square in all 25 columns of the maze, the vertical walls on the
+           outside (the outer edges of the maze) are discovered. */
+        /* TODO */
 
-    /* If the 25 walls of one outer edge of the maze have been discovered, the
-       25 walls on the opposing side are also determined as discovered. */
-    /* TODO */
+        /* If you have discovered, or know of open connections to, at least one
+           square in all 25 rows of the maze, the horizontal walls on the
+           outside (the outer edges of the maze) are discovered. */
+        /* TODO */
+
+        /* If the 25 walls of one outer edge of the maze have been discovered,
+           the 25 walls on the opposing side are also determined as discovered.
+        */
+        /* TODO */
+    } while (changed);
 }
 
 void mm_print(MazeMap *mm, FILE *fp)

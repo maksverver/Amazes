@@ -28,6 +28,8 @@ int main()
     mm_look(&mm, "LLBNW", BACK);
     mm_look(&mm, "W", LEFT);
     mm_print(&mm, stdout); fputc('\n', stdout);
+    mm_infer(&mm);
+    mm_print(&mm, stdout); fputc('\n', stdout);
     mm_move(&mm, "TL");
     mm_print(&mm, stdout); fputc('\n', stdout);
     return 0;
