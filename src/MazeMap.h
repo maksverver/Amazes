@@ -2,6 +2,7 @@
 #define MAZE_MAP_H
 
 #include <stdbool.h>
+#include <stdio.h>
 
 /* Values for squares and walls: */
 #define UNKNOWN  0
@@ -17,8 +18,8 @@ typedef enum RelDir  { FRONT = 0, RIGHT = 1, BACK = 2, LEFT = 3 } RelDir;
 #define TURN(dir, rel_dir) ((Dir)(((int)dir + (int)rel_dir + 4)%4))
 #define DR(dir) (dir_dr[(int)dir])
 #define DC(dir) (dir_dc[(int)dir])
-#define RDR(r, dir) ((r + DR(dir) + WIDTH )%WIDTH )
-#define CDC(c, dir) ((c + DC(dir) + HEIGHT)%HEIGHT)
+#define RDR(r, dir) ((r + DR(dir) + HEIGHT)%HEIGHT)
+#define CDC(c, dir) ((c + DC(dir) + WIDTH)%WIDTH)
 
 #define SQUARE(mm, r, c)        (mm->grid[r][c].square)
 #define SET_SQUARE(mm, r, c, v) ((void)(mm->grid[r][c].square = v))
@@ -26,11 +27,9 @@ typedef enum RelDir  { FRONT = 0, RIGHT = 1, BACK = 2, LEFT = 3 } RelDir;
 #define WALL(mm, r, c, dir)         (mm_get_wall(mm, r, c, dir))
 #define SET_WALL(mm, r, c, dir, v)  ((void)mm_set_wall(mm, r, c, dir, v))
 
-typedef unsigned char uchar;
-
 typedef struct MazeCell
 {
-    uchar square : 2, wall_e : 2, wall_n : 2;
+    signed char square : 2, wall_e : 2, wall_n : 2;
 } MazeCell;
 
 typedef struct Point
@@ -55,9 +54,11 @@ typedef struct MazeMap
 extern int dir_dr[4], dir_dr[4];
 
 extern void mm_clear(MazeMap *mm);
-extern void mm_add_line(MazeMap *mm, const char *line, RelDir rel_dir);
+extern void mm_look(MazeMap *mm, const char *line, RelDir rel_dir);
+extern void mm_infer(MazeMap *mm);
 extern void mm_move(MazeMap *mm, const char *move);
-extern int mm_get_wall(MazeMap *mm, int r, int c, Dir dir);
+extern int  mm_get_wall(MazeMap *mm, int r, int c, Dir dir);
 extern void mm_set_wall(MazeMap *mm, int r, int c, Dir dir, int val);
+extern void mm_print(MazeMap *mm, FILE *fp);
 
 #endif /* ndef MAZE_MAP_H */

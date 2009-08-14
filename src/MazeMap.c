@@ -32,18 +32,48 @@ void mm_set_wall(MazeMap *mm, int r, int c, Dir dir, int val)
 
 void mm_clear(MazeMap *mm)
 {
-    memset(mm, 0, sizeof(MazeMap));
-    mm->dir   = NORTH;
+    memset(mm->grid, 0, sizeof(mm->grid));
+    SET_SQUARE(mm, 0, 0, PRESENT);
     mm->loc.r = 0;
     mm->loc.c = 0;
-    SET_SQUARE(mm, 0, 0, PRESENT);
+    mm->dir   = NORTH;
+    mm->border.left   = 0;
+    mm->border.top    = 0;
+    mm->border.right  = 1;
+    mm->border.bottom = 1;
+    mm->bound_ns = false;
+    mm->bound_ew = false;
 }
 
-void mm_add_line(MazeMap *mm, const char *line, RelDir rel_dir)
+static void push_border(MazeMap *mm, int r, int c, Dir dir)
 {
-    Dir dir   = TURN(mm->dir, rel_dir),
-        left  = TURN(dir, LEFT),
-        right = TURN(dir, RIGHT);
+    switch (dir)
+    {
+    case NORTH:
+        if (r == mm->border.top)
+            mm->border.top = (mm->border.top + HEIGHT - 1)%HEIGHT;
+        break;
+    case EAST:
+        if ((c + 1)%WIDTH == mm->border.right)
+            mm->border.right = (mm->border.right + 1)%WIDTH;
+        break;
+    case SOUTH:
+        if ((r + 1)%HEIGHT == mm->border.bottom)
+            mm->border.bottom = (mm->border.bottom + 1)%HEIGHT;
+        break;
+    case WEST:
+        if (c == mm->border.left)
+            mm->border.left = (mm->border.left + WIDTH - 1)%WIDTH;
+        break;
+    }
+}
+
+void mm_look(MazeMap *mm, const char *line, RelDir rel_dir)
+{
+    Dir front = TURN(mm->dir, rel_dir),
+        left  = TURN(front, LEFT),
+        right = TURN(front, RIGHT),
+        back  = TURN(front, BACK);
 
     int r = mm->loc.r,
         c = mm->loc.c;
@@ -65,29 +95,32 @@ void mm_add_line(MazeMap *mm, const char *line, RelDir rel_dir)
         case 'N':   /* no opening on either side */
             break;
         case 'W':  /* wall immediately ahead: */
-            SET_WALL(mm, r, c, FRONT, PRESENT);
+            SET_WALL(mm, r, c, front, PRESENT);
             assert(*line == '\0');
             return;
         default:  /* invalid char */
             assert(0);
         }
 
-        r = RDR(r, dir);
-        c = CDC(c, dir);
+        push_border(mm, r, c, front);
+        r = RDR(r, front);
+        c = CDC(c, front);
 
         SET_SQUARE(mm, r, c, PRESENT);
-        SET_WALL(mm, r, c, BACK, ABSENT);
+        SET_WALL(mm, r, c, back, ABSENT);
+        SET_WALL(mm, r, c, left, open_left ? ABSENT : PRESENT);
+        SET_WALL(mm, r, c, right, open_right ? ABSENT : PRESENT);
 
         if (open_left)
         {
-            SET_WALL(mm, r, c, LEFT, PRESENT);
             SET_SQUARE(mm, RDR(r, left), CDC(c, left), PRESENT);
+            push_border(mm, r, c, left);
         }
 
         if (open_right)
         {
-            SET_WALL(mm, r, c, RIGHT, PRESENT);
             SET_SQUARE(mm, RDR(r, right), CDC(c, right), PRESENT);
+            push_border(mm, r, c, right);
         }
     }
 
@@ -111,6 +144,104 @@ void mm_move(MazeMap *mm, const char *move)
         }
         mm->dir = TURN(mm->dir, rel_dir);
         mm->loc.r = RDR(mm->loc.r, mm->dir);
-        mm->loc.r = CDC(mm->loc.c, mm->dir);
+        mm->loc.c = CDC(mm->loc.c, mm->dir);
     }
+}
+
+void mm_infer(MazeMap *mm)
+{
+    /* A square that you have not yet discovered, but for which you have
+       discovered three of its walls, is also discovered. This square is called
+       a 'dead-end'-square. The opening from this square to the next square is
+       also discovered.
+
+       A square that has one discovered opening to a 'dead-end'-square and two
+       discovered walls is also discovered. This square is also called a
+       'dead-end'-square. Now both openings are discovered.
+
+       A square that has two discovered openings to 'dead-end'-squares and has
+       one discovered wall is also discovered. This square is also called a
+       'dead-end'-square. The three openings from this square are also
+       discovered.
+
+       A square that has three discovered openings to 'dead-end'-squares is also
+       discovered. This square is also called a 'dead-end'-square. All four
+       openings for this square are discovered.
+    */
+    /* TODO */
+
+    /* Discovery of walls */
+
+    /* If for a corner in the maze you have discovered that three edges are
+      openings, the fourth edge has to be a wall and is discovered. */
+    /* TODO */
+
+    /* If you have discovered, or know of open connections to, at least one
+       square in all 25 columns of the maze, the vertical walls on the outside
+       (the outer edges of the maze) are discovered. */
+    /* TODO */
+
+    /* If you have discovered, or know of open connections to, at least one
+       square in all 25 rows of the maze, the horizontal walls on the outside
+       (the outer edges of the maze) are discovered. */
+    /* TODO */
+
+    /* If the 25 walls of one outer edge of the maze have been discovered, the
+       25 walls on the opposing side are also determined as discovered. */
+    /* TODO */
+}
+
+void mm_print(MazeMap *mm, FILE *fp)
+{
+    int r, c, v;
+    r = mm->border.top;
+    do {
+        /* Line 2r */
+        c = mm->border.left;
+        do {
+            fputc('+', fp);
+            v = WALL(mm, r, c, NORTH);
+            fputc(v == PRESENT ? '-' : v == ABSENT ? ' ' : '?', fp);
+        } while ((c = (c + 1)%WIDTH) != mm->border.right);
+        fputc('+', fp);
+        fputc('\n', fp);
+
+        /* Line 2r + 1 */
+        c = mm->border.left;
+        do {
+            v = WALL(mm, r, c, WEST);
+            fputc(v == PRESENT ? '|' : v == ABSENT ? ' ' : '?', fp);
+            v = SQUARE(mm, r, c);
+            if (r == mm->loc.r && c == mm->loc.c)
+            {
+                assert(v == PRESENT);
+                switch (mm->dir)
+                {
+                case NORTH: fputc('^', fp); break;
+                case EAST:  fputc('>', fp); break;
+                case SOUTH: fputc('v', fp); break;
+                case WEST:  fputc('<', fp); break;
+                default: assert(0);
+                }
+            }
+            else
+            {
+                assert(v != ABSENT);
+                fputc(v == PRESENT ? ' ' : '?', fp);
+            }
+        } while ((c = (c + 1)%WIDTH) != mm->border.right);
+        v = WALL(mm, r, c, WEST);
+        fputc(v == PRESENT ? '|' : v == ABSENT ? ' ' : '?', fp);
+        fputc('\n', fp);
+    } while ((r = (r + 1)%HEIGHT) != mm->border.bottom);
+
+    /* Line 2r */
+    c = mm->border.left;
+    do {
+        fputc('+', fp);
+        v = WALL(mm, r, c, NORTH);
+        fputc(v == PRESENT ? '-' : v == ABSENT ? ' ' : '?', fp);
+    } while ((c = (c + 1)%WIDTH) != mm->border.right);
+    fputc('+', fp);
+    fputc('\n', fp);
 }

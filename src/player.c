@@ -1,9 +1,12 @@
+#include "MazeMap.h"
 #include <stdio.h>
 #include <assert.h>
 #include <string.h>
 #include <stdlib.h>
 
 static char current_line[1024];
+
+MazeMap mm;
 
 const char *next_line()
 {
@@ -14,10 +17,18 @@ const char *next_line()
         fprintf(stderr, "Could not read the next line! Exiting.");
         exit(EXIT_FAILURE);
     }
-    
+    return current_line;
 }
 
 int main()
 {
-    
+    mm_clear(&mm);
+    mm_look(&mm, "W", FRONT);
+    mm_look(&mm, "W", RIGHT);
+    mm_look(&mm, "LLBNW", BACK);
+    mm_look(&mm, "W", LEFT);
+    mm_print(&mm, stdout); fputc('\n', stdout);
+    mm_move(&mm, "TL");
+    mm_print(&mm, stdout); fputc('\n', stdout);
+    return 0;
 }
