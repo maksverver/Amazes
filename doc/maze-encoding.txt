@@ -1,11 +1,36 @@
+HUMAN-READABLE ENCODING:
+
+Encoding looks like this (2x2 maze):
+
+    +-+-+
+    |  <|
+    + +-+
+    | ??|
+    +-+-+
+
+All grid points are `+'; leading space is not allowed. The first line determines
+the width of the grid.
+
+                 present absent  unknown
+Vertical wall     `|'     ` '     `?'
+Horizontal wall   `-'     ` '     `?'
+Square            ` '     N/A     `?'
+
+Additionally, at most one square indicates the player's location and orientation
+using a single character: `^', `>', `v' or `<' depending on whether the player
+is facing North, East, South or West, respectively, and is implicitly present.
+
+
+COMPACT URL-SAFE ENCODING:
+
 The maze encoding consists of seven fields, concatenated. Values are encoded in
 base 64 using a URL-safe alphabet: `A'-`Z', `a'-`z', `0'-`9', `-', `_'
 Multi-character values are encoded with the least-significant character first.
 
-1. height:     Number of rows     (one base-64 digit)
-2. width:      Number of columns  (one base-64 digit)
-3. row:        Player's row       (zero-based, one base-64 digit)
-4. col:        Player's column    (zero-based, one base-64 digit)
+1. height:     Number of rows
+2. width:      Number of columns
+3. row:        Player's row       (one-based; zero if NULL)
+4. col:        Player's column    (one-based; zero if NULL)
 5. dir:        Player's direction (N=0/E=1/S=1/W=1, one base-64 digit)
 6. squares:    For each square (in row-major order) one bit:
                     0 if not discovered
