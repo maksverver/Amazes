@@ -51,7 +51,7 @@ typedef struct MazeMap
     bool        bound_ns, bound_ew;
 } MazeMap;
 
-extern int dir_dr[4], dir_dr[4];
+extern int dir_dr[4], dir_dc[4];
 
 extern void mm_clear(MazeMap *mm);
 extern void mm_look(MazeMap *mm, const char *line, RelDir rel_dir);
