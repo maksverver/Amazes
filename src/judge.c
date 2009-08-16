@@ -176,6 +176,7 @@ static void place_player(MazeMap *mm)
         mm->dir   = (Dir)(rand()%4);
         back = TURN(mm->dir, BACK);
     } while (WALL(&mm_master, mm->loc.r, mm->loc.c, back) != ABSENT);
+    SET_SQUARE(mm, mm->loc.r, mm->loc.c, PRESENT);
 }
 
 static void player_looks(int player)
@@ -374,6 +375,7 @@ int main(int argc, char *argv[])
         if (!player_moves(p, turn)) break;
         mm_infer(&mm_player[p]);
         player_scores(t, p, turn);
+        fflush(stdout);
     }
     printf("------------------------------------------------\n");
     finalize();

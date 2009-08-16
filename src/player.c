@@ -66,6 +66,8 @@ int main()
     int turn;
 
     mm_clear(&mm);
+    SET_SQUARE(&mm, mm.loc.r, mm.loc.c, PRESENT);
+
     if (strcmp(get_line(false), "Start") == 0)
     {
         /* I start -- not sure what good that does me though. */
@@ -75,6 +77,11 @@ int main()
     for (turn = 0; ; ++turn)
     {
         read_input();
+        /*
+        mm_print(&mm, stderr);
+        fprintf(stderr, "%s\n", mm_encode(&mm));
+        fflush(stderr);
+        */
 
         if (turn == MAX_TURNS - 1)
         {

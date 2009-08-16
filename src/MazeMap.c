@@ -45,7 +45,6 @@ void mm_clear_squares(MazeMap *mm)
 void mm_clear(MazeMap *mm)
 {
     memset(mm->grid, 0, sizeof(mm->grid));
-    SET_SQUARE(mm, 0, 0, PRESENT);
     mm->loc.r = 0;
     mm->loc.c = 0;
     mm->dir   = NORTH;
