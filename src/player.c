@@ -195,9 +195,11 @@ int main()
     for (turn = 0; ; ++turn)
     {
         read_input();
+        mm_infer(&mm);
+
         /*
-        mm_print(&mm, stderr);
-        fprintf(stderr, "%s\n", mm_encode(&mm));
+        mm_print(&mm, stderr, false);
+        fprintf(stderr, "(%s)\n", mm_encode(&mm, false));
         fflush(stderr);
         */
 

@@ -196,46 +196,47 @@ void mm_infer(MazeMap *mm)
         /* If for a corner in the maze you have discovered that three edges are
            openings, the fourth edge has to be a wall and is discovered. */
         {
-            int r, c;
-            for (r = 0; r < HEIGHT; ++r)
+            int r0, c0;
+            for (r0 = 0; r0 < HEIGHT; ++r0)
             {
-                for (c = 0; c < WIDTH; ++c)
+                for (c0 = 0; c0 < WIDTH; ++c0)
                 {
-                    int n, e, s, w, na, nu;
-                    n = mm->grid[r    ][c + 1].wall_w;
-                    e = mm->grid[r + 1][c + 1].wall_n;
-                    s = mm->grid[r + 1][c + 1].wall_w;
-                    w = mm->grid[r + 1][c    ].wall_n;
+                    const int r1 = (r0 + 1)%HEIGHT;
+                    const int c1 = (c0 + 1)%WIDTH;
+                    int n, e, s, w, na;
+                    n = mm->grid[r0][c1].wall_w;
+                    e = mm->grid[r1][c1].wall_n;
+                    s = mm->grid[r1][c1].wall_w;
+                    w = mm->grid[r1][c0].wall_n;
                     na = 0;
                     if (n == ABSENT) ++na;
                     if (e == ABSENT) ++na;
                     if (s == ABSENT) ++na;
                     if (w == ABSENT) ++na;
-                    nu = 0;
                     assert(na <= 3);
                     if (na == 3)
                     {
                         if (n == UNKNOWN)
                         {
-                            mm->grid[r    ][c + 1].wall_w = PRESENT;
+                            mm->grid[r0][c1].wall_w = PRESENT;
                             changed = true;
                         }
                         else
                         if (e == UNKNOWN)
                         {
-                            mm->grid[r + 1][c + 1].wall_n = PRESENT;
+                            mm->grid[r1][c1].wall_n = PRESENT;
                             changed = true;
                         }
                         else
                         if (s == UNKNOWN)
                         {
-                            mm->grid[r + 1][c + 1].wall_w = PRESENT;
+                            mm->grid[r1][c1].wall_w = PRESENT;
                             changed = true;
                         }
                         else
                         if (w == UNKNOWN)
                         {
-                            mm->grid[r + 1][c    ].wall_n = PRESENT;
+                            mm->grid[r1][c0].wall_n = PRESENT;
                             changed = true;
                         }
                     }

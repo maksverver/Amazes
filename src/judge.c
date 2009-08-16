@@ -367,10 +367,17 @@ int main(int argc, char *argv[])
         if (t == 0) write_player(p, "Start");
         if (p == 1) continue;  /* player 2 -- TODO later */
         player_looks(p);
-        turn = read_player(p);
-        if (!player_moves(p, turn)) break;
         mm_infer(&mm_player[p]);
         player_scores(t, p, turn);
+
+        /*
+        mm_print(&mm_player[p], stdout, true);
+        printf("(%s)\n", mm_encode(&mm_player[p], true));
+        */
+
+        turn = read_player(p);
+        if (!player_moves(p, turn)) break;
+
         fflush(stdout);
     }
     printf("------------------------------------------------\n");

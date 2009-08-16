@@ -117,23 +117,28 @@ bool mm_scan(MazeMap *mm, FILE *fp)
     return true;
 }
 
-void mm_print(MazeMap *mm, FILE *fp)
+void mm_print(MazeMap *mm, FILE *fp, bool full)
 {
+    const int top    = full ? 0 : mm->border.top;
+    const int left   = full ? 0 : mm->border.left;
+    const int bottom = full ? 0 : mm->border.bottom;
+    const int right  = full ? 0 : mm->border.right;
     int r, c, v;
-    r = mm->border.top;
+
+    r = top;
     do {
         /* Line 2r */
-        c = mm->border.left;
+        c = left;
         do {
             fputc('+', fp);
             v = WALL(mm, r, c, NORTH);
             fputc(v == PRESENT ? '-' : v == ABSENT ? ' ' : '?', fp);
-        } while ((c = (c + 1)%WIDTH) != mm->border.right);
+        } while ((c = (c + 1)%WIDTH) != right);
         fputc('+', fp);
         fputc('\n', fp);
 
         /* Line 2r + 1 */
-        c = mm->border.left;
+        c = left;
         do {
             v = WALL(mm, r, c, WEST);
             fputc(v == PRESENT ? '|' : v == ABSENT ? ' ' : '?', fp);
@@ -155,19 +160,19 @@ void mm_print(MazeMap *mm, FILE *fp)
                 assert(v != ABSENT);
                 fputc(v == PRESENT ? ' ' : '?', fp);
             }
-        } while ((c = (c + 1)%WIDTH) != mm->border.right);
+        } while ((c = (c + 1)%WIDTH) != right);
         v = WALL(mm, r, c, WEST);
         fputc(v == PRESENT ? '|' : v == ABSENT ? ' ' : '?', fp);
         fputc('\n', fp);
-    } while ((r = (r + 1)%HEIGHT) != mm->border.bottom);
+    } while ((r = (r + 1)%HEIGHT) != bottom);
 
     /* Line 2r */
-    c = mm->border.left;
+    c = left;
     do {
         fputc('+', fp);
         v = WALL(mm, r, c, NORTH);
         fputc(v == PRESENT ? '-' : v == ABSENT ? ' ' : '?', fp);
-    } while ((c = (c + 1)%WIDTH) != mm->border.right);
+    } while ((c = (c + 1)%WIDTH) != right);
     fputc('+', fp);
     fputc('\n', fp);
 }
@@ -260,9 +265,15 @@ bool mm_decode(MazeMap *mm, const char *desc)
     return true;
 }
 
-const char *mm_encode(MazeMap *mm)
+const char *mm_encode(MazeMap *mm, bool full)
 {
     static char buf[512];
+
+    const int top    = full ? 0 : mm->border.top;
+    const int left   = full ? 0 : mm->border.left;
+    const int bottom = full ? 0 : mm->border.bottom;
+    const int right  = full ? 0 : mm->border.right;
+
     char *p = buf;
     int h, w, val, len, r, c, i, j, pass, n;
 
@@ -272,16 +283,14 @@ const char *mm_encode(MazeMap *mm)
     static const int pow3[15] = { 1, 3, 9, 27, 81, 243, 729, 2187, 6561, 19683,
                                   59049, 177147, 531441, 1594323, 4782969 };
 
-    h = (mm->border.bottom - mm->border.top + HEIGHT)%HEIGHT;
-    if (h == 0) h = HEIGHT;
-    w = (mm->border.right - mm->border.left + WIDTH)%WIDTH;
-    if (w == 0) w = WIDTH;
+    h = (bottom == top) ? HEIGHT : (bottom - top + HEIGHT)%HEIGHT;
+    w = (right == left) ? WIDTH : (right - left + WIDTH)%WIDTH;
 
     /* Encode first five fields: */
     *p++ = base64_digits[h];
     *p++ = base64_digits[w];
-    *p++ = base64_digits[1 + (mm->loc.r - mm->border.top + HEIGHT)%HEIGHT];
-    *p++ = base64_digits[1 + (mm->loc.c - mm->border.left + WIDTH)%WIDTH];
+    *p++ = base64_digits[1 + (mm->loc.r - top + HEIGHT)%HEIGHT];
+    *p++ = base64_digits[1 + (mm->loc.c - left + WIDTH)%WIDTH];
     *p++ = base64_digits[(int)mm->dir];
 
     /* Encode squares */
@@ -290,8 +299,8 @@ const char *mm_encode(MazeMap *mm)
     {
         for (j = 0; j < w; ++j)
         {
-            r = (mm->border.top  + i)%HEIGHT;
-            c = (mm->border.left + j)%WIDTH;
+            r = (top  + i)%HEIGHT;
+            c = (left + j)%WIDTH;
             val |= SQUARE(mm, r, c) << len++;
             if (len == 6)
             {
@@ -312,8 +321,8 @@ const char *mm_encode(MazeMap *mm)
         {
             for (j = 0; j < w + (pass ? 1 : 0); ++j)
             {
-                r = (mm->border.top  + i)%HEIGHT;
-                c = (mm->border.left + j)%WIDTH;
+                r = (top  + i)%HEIGHT;
+                c = (left + j)%WIDTH;
                 if (pass == 0)  /* horizontal walls */
                     val += pow3[len++]*(mm->grid[r][c].wall_n + 1);
                 else  /* pass == 1: vertical walls */
