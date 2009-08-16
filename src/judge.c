@@ -414,14 +414,13 @@ int main(int argc, char *argv[])
         if (p == 1) continue;  /* player 2 -- TODO later */
         player_looks(p);
         mm_infer(&mm_player[p]);
+        turn = read_player(p);
         player_scores(t, p, turn);
 
         /*
         mm_print(&mm_player[p], stdout, true);
         printf("(%s)\n", mm_encode(&mm_player[p], true));
         */
-
-        turn = read_player(p);
         if (!player_moves(p, turn)) break;
 
         fflush(stdout);
