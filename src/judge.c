@@ -36,9 +36,10 @@ typedef struct Score
    TODO/FIXME: no support for sudden death yet.
 */
 
+static const char *arg_csv = NULL;
 static MazeMap mm_master, mm_player[2];
 static Score score[2];
-static FILE *fpr[2], *fpw[2];
+static FILE *fpr[2], *fpw[2], *fp_csv = NULL;
 static int pid[2];
 
 /* Determines what `player' can see in the given direction. */
@@ -305,13 +306,26 @@ static void player_scores(int t, int player, const char *turn)
         }
     }
 
-    printf(" %5d %5d %5d %5d %5d %5d %5d %5d\n", t + 1, player + 1,
-           new_score.moves - sc->moves,
-           new_score.sq_disc - sc->sq_disc,
-           new_score.sq_disc_first - sc->sq_disc_first,
-           new_score.captures - sc->captures,
-           total_score(&new_score) - total_score(sc),
-           total_score(&new_score));
+    /* Print scores for this move: */
+    {
+        int moves        = new_score.moves - sc->moves;
+        int discovered   = new_score.sq_disc - sc->sq_disc;
+        int first        = new_score.sq_disc_first - sc->sq_disc_first;
+        int captures     = new_score.captures - sc->captures;
+        int total        = total_score(&new_score);
+        int score        = total - total_score(sc);
+
+        printf(" %5d %5d %5d %5d %5d %5d %5d %5d\n", t/2 + 1, player + 1,
+               moves, discovered, first, captures, score, total );
+
+        if (fp_csv != NULL)
+        {
+            fprintf(fp_csv, "%d,%d,%d,%d,%d,%d,%d,%d", t/2 + 1, player + 1,
+                            moves, discovered, first, captures, score, total);
+            fprintf(fp_csv, ",%s", mm_encode(mm, true));
+            fputc('\n', fp_csv);
+        }
+    }
 
     *sc = new_score;
 }
@@ -332,14 +346,46 @@ static void disable_sigpipe()
     sigaction(SIGPIPE, &sa, NULL);
 }
 
+static int parse_options(int argc, char *argv[])
+{
+    int i, j;
+    for (i = j = 1; i < argc; ++i)
+    {
+        if (memcmp(argv[i], "--csv=", 6) == 0)
+            arg_csv = argv[i] + 6;
+        else
+        if (strcmp(argv[i], "--csv") == 0 && ++i < argc)
+            arg_csv = argv[i];
+        else
+            argv[j++] = argv[i];
+    }
+    return j;
+}
+
+static void open_csv(const char *path)
+{
+    if ((fp_csv = fopen(arg_csv, "wt")) == NULL)
+    {
+        printf("Couldn't open CSV file `%s'!\n", path);
+        exit(EXIT_FAILURE);
+    }
+    fprintf(fp_csv, "Turn,Player,Moves,Discovered,First,Captures,Score,"
+                    "Total,Map\n");
+}
+
 static void initialize(int argc, char *argv[])
 {
+    argc = parse_options(argc, argv);
+
     if (argc != 3)
     {
         printf("usage:\n"
-               "  judge <maze file> <player1 command>\n");
+               "  judge [options] <maze file> <player1 command>\n"
+               "options:\n"
+               "  --csv <file>\n");
         exit(EXIT_FAILURE);
     }
+    if (arg_csv != NULL) open_csv(arg_csv);
 
     disable_sigpipe();
     load_maze(argv[1]);
