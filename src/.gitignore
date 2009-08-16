@@ -1,3 +1,5 @@
 *.o
 player
 convert
+judge
+submission.c

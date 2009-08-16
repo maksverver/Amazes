@@ -1,0 +1,6 @@
+player:
+- test official submission
+
+judge:
+- support for two-player games
+- later: support for manual play?
