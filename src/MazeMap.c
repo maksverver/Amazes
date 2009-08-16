@@ -165,6 +165,54 @@ void mm_turn(MazeMap *mm, const char *turn)
     while (*turn) mm_move(mm, *turn++);
 }
 
+static bool mark_dead_end(MazeMap *mm, bool dead_end[HEIGHT][WIDTH],
+                          int r, int c)
+{
+    int num_walls = 0, num_dead_adjacent = 0, dir;
+    bool changed = false;
+
+    if (dead_end[r][c]) return false;
+
+    for (dir = 0; dir < 4; ++dir)
+    {
+        int w = WALL(mm, r, c, dir);
+        if (w == PRESENT)
+            ++num_walls;
+        else
+        if (w == ABSENT && dead_end[RDR(r, dir)][CDC(c, dir)])
+            ++num_dead_adjacent;
+    }
+    assert(num_walls + num_dead_adjacent < 4);
+
+    if (num_walls + num_dead_adjacent == 3)
+    {
+        dead_end[r][c] = true;
+        if (SQUARE(mm, r, c) == UNKNOWN)
+        {
+            SET_SQUARE(mm, r, c, PRESENT);
+            changed = true;
+        }
+        for (dir = 0; dir < 4; ++dir)
+        {
+            if (WALL(mm, r, c, dir) == UNKNOWN)
+            {
+                SET_WALL(mm, r, c, dir, ABSENT);
+                changed = true;
+            }
+        }
+        for (dir = 0; dir < 4; ++dir)
+        {
+            if (WALL(mm, r, c, dir) == ABSENT)
+            {
+                if (mark_dead_end(mm, dead_end, RDR(r, dir), CDC(c, dir)))
+                    changed = true;
+            }
+        }
+    }
+
+    return changed;
+}
+
 void mm_infer(MazeMap *mm)
 {
     bool changed;
@@ -189,7 +237,19 @@ void mm_infer(MazeMap *mm)
            also discovered. This square is also called a 'dead-end'-square. All
            four openings for this square are discovered.
         */
-        /* TODO */
+        {
+            bool dead_end[HEIGHT][WIDTH];
+            int  r, c;
+            memset(dead_end, 0, sizeof(dead_end));
+            for (r = 0; r < HEIGHT; ++r)
+            {
+                for (c = 0; c < WIDTH; ++c)
+                {
+                    if (mark_dead_end(mm, dead_end, r, c))
+                        changed = true;
+                }
+            }
+        }
 
         /* Discovery of walls */
 
@@ -243,22 +303,40 @@ void mm_infer(MazeMap *mm)
                 }
             }
         }
-        /* TODO */
 
         /* If you have discovered, or know of open connections to, at least one
            square in all 25 columns of the maze, the vertical walls on the
            outside (the outer edges of the maze) are discovered. */
-        /* TODO */
+        if (!mm->bound_ew && mm->border.left == mm->border.right)
+        {
+            int r;
+            mm->bound_ew = true;
+            for (r = 0; r < HEIGHT; ++r)
+            {
+                mm->grid[r][mm->border.left].wall_w = true;
+            }
+            changed = true;
+        }
 
         /* If you have discovered, or know of open connections to, at least one
            square in all 25 rows of the maze, the horizontal walls on the
            outside (the outer edges of the maze) are discovered. */
-        /* TODO */
+        if (!mm->bound_ns && mm->border.top == mm->border.bottom)
+        {
+            int c;
+            mm->bound_ns = true;
+            for (c = 0; c < WIDTH; ++c)
+            {
+                mm->grid[mm->border.top][c].wall_n = true;
+            }
+            changed = true;
+        }
 
         /* If the 25 walls of one outer edge of the maze have been discovered,
            the 25 walls on the opposing side are also determined as discovered.
         */
-        /* TODO */
+        /* (No need to code; this works automatically in the current state
+            representation, and the benefit is unclear anyway.) */
     } while (changed);
 }
 
