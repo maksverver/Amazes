@@ -8,7 +8,6 @@
 
 #define MAX_TURNS 150
 
-static char *current_line;
 static MazeMap mm;
 
 static char *get_line(bool remove)
@@ -57,7 +56,7 @@ static void read_input()
 
 static void write_output(const char *move)
 {
-    mm_move(&mm, move);
+    mm_turn(&mm, move);
     fprintf(stdout, "%s\n", move);
     fflush(stdout);
 }

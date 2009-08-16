@@ -1,19 +1,47 @@
 #define _POSIX_SOURCE
 #include "MazeMap.h"
 #include "MazeIO.h"
+#include <assert.h>
+#include <ctype.h>
+#include <signal.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-#include <ctype.h>
-#include <signal.h>
 
-#define MAX_ARGS 3
+#define MAX_ARGS 50
+
+typedef struct Score
+{
+    int moves, sq_disc, sq_disc_first, captures;
+} Score;
+
+/* Global data:
+
+   The master maze map keeps track of existing walls and squares discovered
+   (by either player). Initially, all squares are unknown, and all wals are
+   known (either present or absent). This is used to determine valid moves and
+   keep track of which player discovers squares first.
+
+   For each player, there is a maze map that keeps track of information this
+   player has; this information is used to determine how many squares each
+   player has discovered.
+
+   For each player, we have a Score struct that keeps track of the total
+   score, consisting of:
+    - number of moves requested (-1 point each)
+    - number of squares discovered (1 point each)
+    - number of squares discovered first (1 additional point each)
+    - number of times the opponent was captured (100 points each)
+   TODO/FIXME: no support for sudden death yet.
+*/
 
 static MazeMap mm_master, mm_player[2];
+static Score score[2];
 static FILE *fpr[2], *fpw[2];
 static int pid[2];
 
+/* Determines what `player' can see in the given direction. */
 static char *line_of_sight(int player, RelDir rel_dir)
 {
     static char buf[1 + (WIDTH > HEIGHT) ? WIDTH : HEIGHT];
@@ -118,6 +146,7 @@ static void load_maze(const char *path)
         exit(EXIT_FAILURE);
     }
     fclose(fp);
+    mm_clear_squares(&mm_master);
 }
 
 static void write_player(int p, const char *msg)
@@ -146,71 +175,208 @@ static void place_player(MazeMap *mm)
         mm->loc.c = rand()%WIDTH;
         mm->dir   = (Dir)(rand()%4);
         back = TURN(mm->dir, BACK);
-    } while (WALL(mm, mm->loc.r, mm->loc.c, back) != ABSENT);
+    } while (WALL(&mm_master, mm->loc.r, mm->loc.c, back) != ABSENT);
 }
 
-/* Checks the syntax of the move for validity. */
+static void player_looks(int player)
+{
+    static const Dir look_dirs[4] = { FRONT, RIGHT, BACK, LEFT };
+
+    int d;
+
+    for (d = 0; d < 4; ++d)
+    {
+        Dir dir = look_dirs[d];
+        const char *line = line_of_sight(player, dir);
+        mm_look(&mm_player[player], line, dir);
+        write_player(0, line);
+    }
+
+    /* distance to opponent -- TODO later */
+    write_player(0, "-1");
+}
+
+/* Checks the syntax of the turn for syntactic validity.
+
+   A turn is syntactically valid if it consists only of letters F, T, L and R,
+   and is between 1 and 256 (inclusive) letters long. */
 static bool is_valid_turn(const char *s)
 {
     const char *p;
     for (p = s; *p; ++p) if (strchr("FTLR", *p) == NULL) return false;
-    return p - s <= 256;
+    return p > s && p <= s + 256;
 }
 
-
-int main(int argc, char *argv[])
+/* Computes the length of the maximal prefix of `turn' that constitues a valid
+   turn for `player', assuming the turn is syntactically valid. A turn is valid
+   if all moves in the turn can be performed in order without walking through
+   walls. */
+static int valid_turn_size(const char *turn, int r, int c, Dir dir)
 {
-    int turn;
-    struct sigaction sa;
+    int i;
 
-    /* Ignore SIGPIPE */
+    for (i = 0; turn[i]; ++i)
+    {
+        switch (turn[i])
+        {
+        case 'F': dir = TURN(dir, FRONT); break;
+        case 'T': dir = TURN(dir, BACK);  break;
+        case 'L': dir = TURN(dir, LEFT);  break;
+        case 'R': dir = TURN(dir, RIGHT); break;
+        default: assert(0);
+        }
+        if (WALL(&mm_master, r, c, dir) != ABSENT) break;
+        r = RDR(r, dir);
+        c = CDC(c, dir);
+    }
+
+    return i;
+}
+
+static bool player_moves(int player, const char *turn)
+{
+    MazeMap *mm = &mm_player[player];
+    Point old_loc = mm->loc;
+    int len;
+
+    if (turn == NULL || !is_valid_turn(turn))
+    {
+        printf("Player %d made an invalid move: `%s'!\n",
+                player + 1, turn == NULL ? "<eof>" : turn);
+        return false;
+    }
+
+    /* Perform valid moves */
+    len = valid_turn_size(turn, mm->loc.r, mm->loc.c, mm->dir);
+    if (len < (int)strlen(turn))
+    {
+        printf("WARNING: Player %d's turn (`%s') was truncated to %d moves.\n",
+               player + 1, turn, len);
+    }
+    for (; len > 0; --len) mm_move(mm, *turn++);
+
+    /* If we end up at our starting point, do an extra T move */
+    if (mm->loc.r == old_loc.r && mm->loc.c == old_loc.c)
+    {
+        printf("WARNING: Player %d returned to his original location.\n",
+               player + 1);
+        mm_move(mm, 'T');
+    }
+
+    return true;
+}
+
+static int total_score(const Score *sc)
+{
+    return -sc->moves + sc->sq_disc + sc->sq_disc_first + 100*sc->captures;
+}
+
+/* FIXME: is starting square initially discovered or not?
+          if so, call player_scores at start of game before any turns have
+          been made. */
+
+static void player_scores(int t, int player, const char *turn)
+{
+    int r, c;
+    MazeMap *mm = &mm_player[player];
+    Score *sc = &score[player];
+    Score new_score = score[player];
+
+    new_score.moves          = sc->moves + strlen(turn);
+    new_score.captures       = sc->captures;   /* TODO! */
+    new_score.sq_disc        = 0;
+    new_score.sq_disc_first  = sc->sq_disc_first;
+
+    /* Count discovered squares */
+    new_score.sq_disc = 0;
+    for (r = 0; r < HEIGHT; ++r)
+    {
+        for (c = 0; c < WIDTH; ++c)
+        {
+            if (SQUARE(mm, r, c) == PRESENT)
+            {
+                ++new_score.sq_disc;
+                if (SQUARE(&mm_master, r, c) == UNKNOWN)
+                {
+                    SET_SQUARE(&mm_master, r, c, PRESENT);
+                    ++new_score.sq_disc_first;
+                }
+            }
+        }
+    }
+
+    printf(" %5d %5d %5d %5d %5d %5d %5d %5d\n", t + 1, player + 1,
+           new_score.moves - sc->moves,
+           new_score.sq_disc - sc->sq_disc,
+           new_score.sq_disc_first - sc->sq_disc_first,
+           new_score.captures - sc->captures,
+           total_score(&new_score) - total_score(sc),
+           total_score(&new_score));
+
+    *sc = new_score;
+}
+
+static int final_score(int player)
+{
+    int res = total_score(&score[player]);
+    if (res < 0) res = 0;
+    if (res > 1000) res = 1000;
+    return res;
+}
+
+static void disable_sigpipe()
+{
+    struct sigaction sa;
     memset(&sa, 0, sizeof(sa));
     sa.sa_handler = SIG_IGN;
     sigaction(SIGPIPE, &sa, NULL);
+}
 
+static void initialize(int argc, char *argv[])
+{
     if (argc != 3)
     {
         printf("usage:\n"
                "  judge <maze file> <player1 command>\n");
-        return 1;
+        exit(EXIT_FAILURE);
     }
+
+    disable_sigpipe();
 
     load_maze(argv[1]);
-    memcpy(&mm_player[0], &mm_master, sizeof(MazeMap));
+
+    mm_clear(&mm_player[0]);
     place_player(&mm_player[0]);
     launch(argv[2], &fpr[0], &fpw[0], &pid[0]);
+}
 
-    for (turn = 0; turn < 300; ++turn)
-    {
-        int p = turn%2;
-        char *turn;
-
-        if (turn == 0) write_player(p, "Start");
-
-        if (p == 1) continue;  /* player 2 -- TODO later */
-
-        write_player(0, line_of_sight(p, FRONT));
-        write_player(0, line_of_sight(p, RIGHT));
-        write_player(0, line_of_sight(p, BACK));
-        write_player(0, line_of_sight(p, LEFT));
-        write_player(0, "-1");  /* distance to opponent -- TODO later */
-
-        turn = read_player(p);
-        if (turn == NULL || !is_valid_turn(turn))
-        {
-            printf("Player %d made an invalid move: `%s'!\n",
-                   p + 1, turn == NULL ? "<eof>" : turn);
-            break;
-        }
-
-        /* TODO:
-            1. truncate move to valid parts only (don't walk through walls)
-            2. if move ends at same square it begun, do extra T
-            3. infer newly discovered squares (LATER: keep score)
-        */
-        mm_move(&mm_player[p], turn);
-    }
-
+static void finalize()
+{
     write_player(0, "Quit");
+}
+
+int main(int argc, char *argv[])
+{
+    int t;
+    initialize(argc, argv);
+
+    printf("Turn  Player Moves Disc. First Capt. Score Total\n");
+    printf("------------------------------------------------\n");
+
+    for (t = 0; t < 300; ++t)
+    {
+        int p = t%2;
+        const char *turn;
+        if (t == 0) write_player(p, "Start");
+        if (p == 1) continue;  /* player 2 -- TODO later */
+        player_looks(p);
+        turn = read_player(p);
+        if (!player_moves(p, turn)) break;
+        mm_infer(&mm_player[p]);
+        player_scores(t, p, turn);
+    }
+    printf("------------------------------------------------\n");
+    finalize();
+    printf("Score: %d - %d\n", final_score(0), final_score(1)); 
     return 0;
 }

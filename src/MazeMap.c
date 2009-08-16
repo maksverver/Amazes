@@ -30,6 +30,18 @@ void mm_set_wall(MazeMap *mm, int r, int c, Dir dir, int val)
     }
 }
 
+void mm_clear_squares(MazeMap *mm)
+{
+    int r, c;
+    for (r = 0; r < HEIGHT; ++r)
+    {
+        for (c = 0; c < WIDTH; ++c)
+        {
+            mm->grid[r][c].square = UNKNOWN;
+        }
+    }
+}
+
 void mm_clear(MazeMap *mm)
 {
     memset(mm->grid, 0, sizeof(mm->grid));
@@ -128,24 +140,26 @@ void mm_look(MazeMap *mm, const char *line, RelDir rel_dir)
     return;
 }
 
-void mm_move(MazeMap *mm, const char *move)
+void mm_move(MazeMap *mm, char move)
 {
-    while (*move)
+    RelDir rel_dir;
+    switch (move)
     {
-        assert(SQUARE(mm, mm->loc.r, mm->loc.c) == PRESENT);  /* debug */
-        RelDir rel_dir;
-        switch (*move++)
-        {
-        case 'F': rel_dir = FRONT; break;
-        case 'T': rel_dir = BACK;  break;
-        case 'L': rel_dir = LEFT;  break;
-        case 'R': rel_dir = RIGHT; break;
-        default: assert(0);   /* invalid char */
-        }
-        mm->dir = TURN(mm->dir, rel_dir);
-        mm->loc.r = RDR(mm->loc.r, mm->dir);
-        mm->loc.c = CDC(mm->loc.c, mm->dir);
+    case 'F': rel_dir = FRONT; break;
+    case 'T': rel_dir = BACK;  break;
+    case 'L': rel_dir = LEFT;  break;
+    case 'R': rel_dir = RIGHT; break;
+    default: assert(0);   /* invalid char */
     }
+    mm->dir = TURN(mm->dir, rel_dir);
+    mm->loc.r = RDR(mm->loc.r, mm->dir);
+    mm->loc.c = CDC(mm->loc.c, mm->dir);
+    SET_SQUARE(mm, mm->loc.r, mm->loc.c, PRESENT);
+}
+
+void mm_turn(MazeMap *mm, const char *turn)
+{
+    while (*turn) mm_move(mm, *turn++);
 }
 
 void mm_infer(MazeMap *mm)
@@ -224,7 +238,6 @@ void mm_infer(MazeMap *mm)
                     }
                 }
             }
-            printf("%d\n", changed);
         }
         /* TODO */
 
@@ -243,4 +256,18 @@ void mm_infer(MazeMap *mm)
         */
         /* TODO */
     } while (changed);
+}
+
+int mm_count_squares(MazeMap *mm)
+{
+    int r, c, res = 0;
+    for (r = 0; r < HEIGHT; ++r)
+    {
+        for (c = 0; c < WIDTH; ++c)
+        {
+            if (mm->grid[r][c].square == PRESENT)
+                ++res;
+        }
+    }
+    return res;
 }
