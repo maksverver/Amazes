@@ -44,16 +44,20 @@ void mm_clear_squares(MazeMap *mm)
 
 void mm_clear(MazeMap *mm)
 {
-    memset(mm->grid, 0, sizeof(mm->grid));
-    mm->loc.r = 0;
-    mm->loc.c = 0;
-    mm->dir   = NORTH;
-    mm->border.left   = 0;
-    mm->border.top    = 0;
-    mm->border.right  = 1;
-    mm->border.bottom = 1;
-    mm->bound_ns = false;
-    mm->bound_ew = false;
+    memset(mm, 0, sizeof(MazeMap));
+}
+
+void mm_initialize(MazeMap *mm, int r, int c, Dir dir)
+{
+    mm_clear(mm);
+    mm->loc.r = r;
+    mm->loc.c = c;
+    mm->dir   = dir;
+    mm->border.top    = r;
+    mm->border.left   = c;
+    mm->border.bottom = (r + 1)%WIDTH;
+    mm->border.right  = (c + 1)%HEIGHT;
+    SET_SQUARE(mm, r, c, PRESENT);
 }
 
 static void push_border(MazeMap *mm, int r, int c, Dir dir)

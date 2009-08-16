@@ -184,8 +184,7 @@ int main()
 {
     int turn;
 
-    mm_clear(&mm);
-    SET_SQUARE(&mm, mm.loc.r, mm.loc.c, PRESENT);
+    mm_initialize(&mm, 0, 0, NORTH);
 
     if (strcmp(get_line(false), "Start") == 0)
     {

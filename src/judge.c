@@ -169,14 +169,13 @@ static char *read_player(int p)
 
 static void place_player(MazeMap *mm)
 {
-    int back;
+    int r, c, dir;
     do {
-        mm->loc.r = rand()%HEIGHT;
-        mm->loc.c = rand()%WIDTH;
-        mm->dir   = (Dir)(rand()%4);
-        back = TURN(mm->dir, BACK);
-    } while (WALL(&mm_master, mm->loc.r, mm->loc.c, back) != ABSENT);
-    SET_SQUARE(mm, mm->loc.r, mm->loc.c, PRESENT);
+        r   = rand()%HEIGHT;
+        c   = rand()%WIDTH;
+        dir = (Dir)(rand()%4);
+    } while (WALL(&mm_master, r, c, TURN(dir, BACK)) != ABSENT);
+    mm_initialize(mm, r, c, dir);
 }
 
 static void player_looks(int player)
@@ -343,10 +342,7 @@ static void initialize(int argc, char *argv[])
     }
 
     disable_sigpipe();
-
     load_maze(argv[1]);
-
-    mm_clear(&mm_player[0]);
     place_player(&mm_player[0]);
     launch(argv[2], &fpr[0], &fpw[0], &pid[0]);
 }

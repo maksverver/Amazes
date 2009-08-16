@@ -55,6 +55,7 @@ extern int dir_dr[4], dir_dc[4];
 
 extern void mm_clear(MazeMap *mm);
 extern void mm_clear_squares(MazeMap *mm);
+extern void mm_initialize(MazeMap *mm, int r, int c, Dir dir);
 extern void mm_look(MazeMap *mm, const char *line, RelDir rel_dir);
 extern void mm_infer(MazeMap *mm);
 extern void mm_move(MazeMap *mm, char move);
