@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/wait.h>
 
 #define MAX_ARGS 50
 
@@ -33,14 +34,16 @@ typedef struct Score
     - number of squares discovered (1 point each)
     - number of squares discovered first (1 additional point each)
     - number of times the opponent was captured (100 points each)
-   TODO/FIXME: no support for sudden death yet.
 */
 
-static const char *arg_csv = NULL;
+static const char *arg_csv;
+static int num_players;
 static MazeMap mm_master, mm_player[2];
+static bool map_complete[2];
 static Score score[2];
-static FILE *fpr[2], *fpw[2], *fp_csv = NULL;
+static FILE *fpr[2], *fpw[2], *fp_csv;
 static int pid[2];
+
 
 /* Determines what `player' can see in the given direction. */
 static char *line_of_sight(int player, RelDir rel_dir)
@@ -161,11 +164,24 @@ static char *read_player(int p)
     static char buf[1024];
     char *eol;
 
+    /* Flush output so it is visible in case the fgets() blocks */
+    fflush(stdout);
+    fflush(stderr);
     if (fgets(buf, sizeof(buf), fpr[p]) == NULL) return NULL;
     if ((eol = strchr(buf, '\n')) == NULL) return NULL;
     while (eol > buf && isspace(*(eol - 1))) --eol;
     *eol = '\0';
     return buf;
+}
+
+/* Returns the squared Euclidian distance between two players */
+static int player_dist()
+{
+    int dr, dc;
+    if (num_players < 2) return -1;
+    dr = mm_player[0].loc.r - mm_player[1].loc.r;
+    dc = mm_player[0].loc.c - mm_player[1].loc.c;
+    return dr*dr + dc*dc;
 }
 
 static void place_player(MazeMap *mm)
@@ -184,17 +200,24 @@ static void player_looks(int player)
     static const Dir look_dirs[4] = { FRONT, RIGHT, BACK, LEFT };
 
     int d;
+    char buf[12];
 
+    /* Write four lines of sight */
     for (d = 0; d < 4; ++d)
     {
         Dir dir = look_dirs[d];
         const char *line = line_of_sight(player, dir);
         mm_look(&mm_player[player], line, dir);
-        write_player(0, line);
+        write_player(player, line);
     }
 
-    /* distance to opponent -- TODO later */
-    write_player(0, "-1");
+    /* Infer other parts of the maze */
+    mm_infer(&mm_player[player]);
+
+    /* Write distance from opponent */
+    extern int snprintf(char *str, size_t size, const char *format, ...);
+    snprintf(buf, sizeof(buf), "%d", player_dist());
+    write_player(player, buf);
 }
 
 /* Checks the syntax of the turn for syntactic validity.
@@ -272,10 +295,6 @@ static int total_score(const Score *sc)
     return -sc->moves + sc->sq_disc + sc->sq_disc_first + 100*sc->captures;
 }
 
-/* FIXME: is starting square initially discovered or not?
-          if so, call player_scores at start of game before any turns have
-          been made. */
-
 static void player_scores(int t, int player, const char *turn)
 {
     int r, c;
@@ -284,7 +303,7 @@ static void player_scores(int t, int player, const char *turn)
     Score new_score = score[player];
 
     new_score.moves          = sc->moves + strlen(turn);
-    new_score.captures       = sc->captures;   /* TODO! */
+    new_score.captures       = sc->captures;
     new_score.sq_disc        = 0;
     new_score.sq_disc_first  = sc->sq_disc_first;
 
@@ -315,12 +334,12 @@ static void player_scores(int t, int player, const char *turn)
         int total        = total_score(&new_score);
         int score        = total - total_score(sc);
 
-        printf(" %5d %5d %5d %5d %5d %5d %5d %5d\n", t/2 + 1, player + 1,
+        printf(" %5d %5d %5d %5d %5d %5d %5d %5d\n", t + 1, player + 1,
                moves, discovered, first, captures, score, total );
 
         if (fp_csv != NULL)
         {
-            fprintf(fp_csv, "%d,%d,%d,%d,%d,%d,%d,%d", t/2 + 1, player + 1,
+            fprintf(fp_csv, "%d,%d,%d,%d,%d,%d,%d,%d", t + 1, player + 1,
                             moves, discovered, first, captures, score, total);
             fprintf(fp_csv, ",%s", mm_encode(mm, true));
             fputc('\n', fp_csv);
@@ -328,6 +347,7 @@ static void player_scores(int t, int player, const char *turn)
     }
 
     *sc = new_score;
+    map_complete[player] = (new_score.sq_disc == HEIGHT*WIDTH);
 }
 
 static int final_score(int player)
@@ -357,6 +377,12 @@ static int parse_options(int argc, char *argv[])
         if (strcmp(argv[i], "--csv") == 0 && ++i < argc)
             arg_csv = argv[i];
         else
+        if (memcmp(argv[i], "--seed=", 7) == 0)
+            srand(atoi(argv[i] + 7));
+        else
+        if (strcmp(argv[i], "--seed") == 0 && ++i < argc)
+            srand(atoi(argv[i]));
+        else
             argv[j++] = argv[i];
     }
     return j;
@@ -375,58 +401,95 @@ static void open_csv(const char *path)
 
 static void initialize(int argc, char *argv[])
 {
+    int p;
+
     argc = parse_options(argc, argv);
 
-    if (argc != 3)
+    if (argc < 3 || argc > 4)
     {
-        printf("usage:\n"
-               "  judge [options] <maze file> <player1 command>\n"
-               "options:\n"
-               "  --csv <file>\n");
+        printf(
+"usage:\n"
+"\tjudge [options] <maze file> <player 1 command> [<player 2 command>]\n"
+"options:\n"
+"\t--csv <file>\n"
+"\t--seed <value>\n");
         exit(EXIT_FAILURE);
     }
     if (arg_csv != NULL) open_csv(arg_csv);
 
-    disable_sigpipe();
     load_maze(argv[1]);
-    place_player(&mm_player[0]);
-    launch(argv[2], &fpr[0], &fpw[0], &pid[0]);
+    num_players = argc - 2;
+    do {
+        for (p = 0; p < num_players; ++p)
+            place_player(&mm_player[p]);
+        printf("placing... %d\n", player_dist());
+    } while (player_dist() < 17*17);
+
+    /* Start player programs: */
+    disable_sigpipe();
+    for (p = 0; p < num_players; ++p)
+        launch(argv[2 + p], &fpr[p], &fpw[p], &pid[p]);
 }
 
 static void finalize()
 {
-    write_player(0, "Quit");
+    int p;
+    for (p = 0; p < num_players; ++p)
+        write_player(p, "Quit");
+    for (p = 0; p < num_players; ++p)
+        waitpid(pid[p], NULL, 0);
 }
 
 int main(int argc, char *argv[])
 {
-    int t;
+    int t, p;
     initialize(argc, argv);
 
-    printf("Turn  Player Moves Disc. First Capt. Score Total\n");
+    printf("#Turn Player Moves Disc. First Capt. Score Total\n");
     printf("------------------------------------------------\n");
 
-    for (t = 0; t < 300; ++t)
-    {
-        int p = t%2;
-        const char *turn;
-        if (t == 0) write_player(p, "Start");
-        if (p == 1) continue;  /* player 2 -- TODO later */
-        player_looks(p);
-        mm_infer(&mm_player[p]);
-        turn = read_player(p);
-        player_scores(t, p, turn);
+    /* Discover starting square */
+    for (p = 0; p < num_players; ++p) player_scores(-1, p, "");
 
+    for (t = 0; t < 150*num_players; ++t)
+    {
+        const char *turn;
+        p = t%num_players;
+        if (t == 0) write_player(p, "Start");
+        player_looks(p);
+        turn = read_player(p);
+        player_scores(t/num_players, p, turn);
         /*
         mm_print(&mm_player[p], stdout, true);
         printf("(%s)\n", mm_encode(&mm_player[p], true));
         */
         if (!player_moves(p, turn)) break;
-
-        fflush(stdout);
+        if (num_players == 1 && map_complete[p]) break;
+        if (player_dist() == 0)
+        {
+            if (map_complete[p]) break;
+            ++score[p].captures;
+        }
     }
     printf("------------------------------------------------\n");
+
+    if (num_players == 1)
+    {
+        printf("Score: %d\n", final_score(0));
+    }
+    else  /* (num_players == 2) */
+    {
+        if (t < 150*num_players)
+        {
+            /* won by sudden-death */
+            printf("Score: %d - %d\n", p == 0 ? 2*final_score(0) : 0,
+                                       p == 1 ? 2*final_score(1) : 0);
+        }
+        else
+        {
+            printf("Score: %d - %d\n", final_score(0), final_score(1)); 
+        }
+    }
     finalize();
-    printf("Score: %d - %d\n", final_score(0), final_score(1)); 
     return 0;
 }

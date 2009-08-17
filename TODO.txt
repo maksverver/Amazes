@@ -1,6 +1,12 @@
+www:
+- online arbiter
+
 player:
+- simple sudden-death mode
 - test official submission
 
 judge:
-- support for two-player games
-- later: support for manual play?
+- LATER: support for manual play?
+
+MazeIO:
+- MAYBE: fix output of side borders when printing in full view

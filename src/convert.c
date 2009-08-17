@@ -8,8 +8,8 @@ int main(int argc, const char *argv[])
     if (argc != 2)
     {
         printf("usage:\n"
-               "  convert <compact description>\n"
-               "  convert <file in human-readable format>\n");
+               "\tconvert <compact description>\n"
+               "\tconvert <file in human-readable format>\n");
         return 1;
     }
 
