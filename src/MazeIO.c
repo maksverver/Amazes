@@ -123,23 +123,26 @@ void mm_print(MazeMap *mm, FILE *fp, bool full)
     const int left   = full ? 0 : mm->border.left;
     const int bottom = full ? 0 : mm->border.bottom;
     const int right  = full ? 0 : mm->border.right;
-    int r, c, v;
+    const int h = (bottom == top) ? HEIGHT : (bottom - top + HEIGHT)%HEIGHT;
+    const int w = (right == left) ? WIDTH : (right - left + WIDTH)%WIDTH;
 
-    r = top;
-    do {
-        /* Line 2r */
-        c = left;
-        do {
+    int r, c, i, j, v;
+
+    for (i = 0; i < h; ++i)
+    {
+        r = (top + i)%HEIGHT;
+        for (j = 0; j < w; ++j)
+        {
+            c = (left + j)%WIDTH;
             fputc('+', fp);
             v = WALL(mm, r, c, NORTH);
             fputc(v == PRESENT ? '-' : v == ABSENT ? ' ' : '?', fp);
-        } while ((c = (c + 1)%WIDTH) != right);
+        }
         fputc('+', fp);
         fputc('\n', fp);
-
-        /* Line 2r + 1 */
-        c = left;
-        do {
+        for (j = 0; j < w; ++j)
+        {
+            c = (left + j)%WIDTH;
             v = WALL(mm, r, c, WEST);
             fputc(v == PRESENT ? '|' : v == ABSENT ? ' ' : '?', fp);
             v = SQUARE(mm, r, c);
@@ -160,19 +163,21 @@ void mm_print(MazeMap *mm, FILE *fp, bool full)
                 assert(v != ABSENT);
                 fputc(v == PRESENT ? ' ' : '?', fp);
             }
-        } while ((c = (c + 1)%WIDTH) != right);
+        }
+        c = (left + j)%WIDTH;
         v = WALL(mm, r, c, WEST);
         fputc(v == PRESENT ? '|' : v == ABSENT ? ' ' : '?', fp);
         fputc('\n', fp);
-    } while ((r = (r + 1)%HEIGHT) != bottom);
+    }
 
     /* Line 2r */
-    c = left;
-    do {
+    for (j = 0; j < w; ++j)
+    {
+        c = (left + j)%WIDTH;
         fputc('+', fp);
         v = WALL(mm, r, c, NORTH);
         fputc(v == PRESENT ? '-' : v == ABSENT ? ' ' : '?', fp);
-    } while ((c = (c + 1)%WIDTH) != right);
+    }
     fputc('+', fp);
     fputc('\n', fp);
 }
@@ -274,8 +279,11 @@ const char *mm_encode(MazeMap *mm, bool full)
     const int bottom = full ? 0 : mm->border.bottom;
     const int right  = full ? 0 : mm->border.right;
 
+    const int h = (bottom == top) ? HEIGHT : (bottom - top + HEIGHT)%HEIGHT;
+    const int w = (right == left) ? WIDTH : (right - left + WIDTH)%WIDTH;
+
     char *p = buf;
-    int h, w, val, len, r, c, i, j, pass, n;
+    int val, len, r, c, i, j, pass, n;
 
     static const char *base64_digits = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdef"
                                        "ghijklmnopqrstuvwxyz0123456789-_";
@@ -283,8 +291,6 @@ const char *mm_encode(MazeMap *mm, bool full)
     static const int pow3[15] = { 1, 3, 9, 27, 81, 243, 729, 2187, 6561, 19683,
                                   59049, 177147, 531441, 1594323, 4782969 };
 
-    h = (bottom == top) ? HEIGHT : (bottom - top + HEIGHT)%HEIGHT;
-    w = (right == left) ? WIDTH : (right - left + WIDTH)%WIDTH;
 
     /* Encode first five fields: */
     *p++ = base64_digits[h];
