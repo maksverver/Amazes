@@ -1,0 +1,8 @@
+- Is starting square initially discovered or not?
+- What is the use of the Start line?
+- What is the use of the orientation (except for complicating IO?)
+- What is the purpose of the last discovery rule:
+  "If the 25 walls of one outer edge of the maze have been discovered,
+   the 25 walls on the opposing side are also determined as discovered."
+  can this ever help your score?
+- How are players placed initially? Are all valid pairings equally likely?
