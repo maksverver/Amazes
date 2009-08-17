@@ -2,11 +2,12 @@ www:
 - online arbiter
 
 player:
-- simple sudden-death mode
 - test official submission
 
 arbiter:
 - LATER: support for manual play?
+- implement correct failure behaviour (if a player produces an illegal move, it 
+  takes "T" turns from then on, to allow the opponent to finish the game)
 
 MazeIO:
 - MAYBE: fix output of side borders when printing in full view
