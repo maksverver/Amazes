@@ -1,5 +1,6 @@
 *.o
 player
 convert
-judge
+arbiter
+manual
 submission.c

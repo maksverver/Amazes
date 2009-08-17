@@ -3,7 +3,7 @@
 #include <string.h>
 #include <assert.h>
 
-void find_distance(MazeMap *mm, int dist[HEIGHT][WIDTH], int r, int c)
+void find_distance(const MazeMap *mm, int dist[HEIGHT][WIDTH], int r, int c)
 {
     Point queue[HEIGHT*WIDTH];
     int dir, pos = 0, end = 0;
@@ -34,7 +34,7 @@ void find_distance(MazeMap *mm, int dist[HEIGHT][WIDTH], int r, int c)
     }
 }
 
-const char *construct_turn(MazeMap *mm, int dist[HEIGHT][WIDTH],
+const char *construct_turn(const MazeMap *mm, int dist[HEIGHT][WIDTH],
                            int r1, int c1, int dir1, int r2, int c2)
 {
     static char path_buf[HEIGHT*WIDTH];

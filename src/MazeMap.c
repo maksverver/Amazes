@@ -6,7 +6,7 @@
 int dir_dr[4] = { -1,  0, +1,  0 };
 int dir_dc[4] = {  0, +1,  0, -1 };
 
-int mm_get_wall(MazeMap *mm, int r, int c, Dir dir)
+int mm_get_wall(const MazeMap *mm, int r, int c, Dir dir)
 {
     if (((int)dir&1) == 0)  /* north/south */
     {
@@ -341,7 +341,7 @@ void mm_infer(MazeMap *mm)
     } while (changed);
 }
 
-int mm_count_squares(MazeMap *mm)
+int mm_count_squares(const MazeMap *mm)
 {
     int r, c, res = 0;
     for (r = 0; r < HEIGHT; ++r)
@@ -353,4 +353,16 @@ int mm_count_squares(MazeMap *mm)
         }
     }
     return res;
+}
+
+int mm_width(const MazeMap *mm)
+{
+    int w = (mm->border.right - mm->border.left + WIDTH)%WIDTH;
+    return w ? w : WIDTH;
+}
+
+int mm_height(const MazeMap *mm)
+{
+    int h = (mm->border.bottom - mm->border.top + WIDTH)%WIDTH;
+    return h ? h : WIDTH;
 }

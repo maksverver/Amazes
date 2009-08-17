@@ -59,8 +59,10 @@ extern void mm_look(MazeMap *mm, const char *line, RelDir rel_dir);
 extern void mm_infer(MazeMap *mm);
 extern void mm_move(MazeMap *mm, char move);
 extern void mm_turn(MazeMap *mm, const char *move);
-extern int  mm_get_wall(MazeMap *mm, int r, int c, Dir dir);
+extern int  mm_get_wall(const MazeMap *mm, int r, int c, Dir dir);
 extern void mm_set_wall(MazeMap *mm, int r, int c, Dir dir, int val);
-extern int  mm_count_squares(MazeMap *mm);
+extern int  mm_count_squares(const MazeMap *mm);
+extern int  mm_width(const MazeMap *mm);
+extern int  mm_height(const MazeMap *mm);
 
 #endif /* ndef MAZE_MAP_H */
