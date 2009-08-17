@@ -263,10 +263,9 @@ static bool player_moves(int player, const char *turn)
     Point old_loc = mm->loc;
     int len;
 
-    if (turn == NULL || !is_valid_turn(turn))
+    if (!is_valid_turn(turn))
     {
-        printf("Player %d made an invalid move: `%s'!\n",
-                player + 1, turn == NULL ? "<eof>" : turn);
+        printf("Player %d made an invalid move: `%s'!\n", player + 1, turn);
         return false;
     }
 
@@ -274,8 +273,8 @@ static bool player_moves(int player, const char *turn)
     len = valid_turn_size(turn, mm->loc.r, mm->loc.c, mm->dir);
     if (len < (int)strlen(turn))
     {
-        printf("WARNING: Player %d's turn (`%s') was truncated to %d moves.\n",
-               player + 1, turn, len);
+        printf("WARNING: Player %d's turn (`%s') was truncated by %d moves.\n",
+               player + 1, turn, (int)strlen(turn) - len);
     }
     for (; len > 0; --len) mm_move(mm, *turn++);
 
@@ -325,6 +324,16 @@ static void player_scores(int t, int player, const char *turn)
         }
     }
 
+    if (new_score.sq_disc == HEIGHT*WIDTH)
+    {
+        map_complete[player] = true;
+    }
+    else
+    {
+        if (player_dist() == 0)
+            ++new_score.captures;
+    }
+
     /* Print scores for this move: */
     {
         int moves        = new_score.moves - sc->moves;
@@ -347,12 +356,12 @@ static void player_scores(int t, int player, const char *turn)
     }
 
     *sc = new_score;
-    map_complete[player] = (new_score.sq_disc == HEIGHT*WIDTH);
 }
 
-static int final_score(int player)
+static int final_score(int player, int winner)
 {
     int res = total_score(&score[player]);
+    if (winner != -1) res = (player == winner) ? 2*res : 0;
     if (res < 0) res = 0;
     if (res > 1000) res = 1000;
     return res;
@@ -451,44 +460,36 @@ int main(int argc, char *argv[])
     /* Discover starting square */
     for (p = 0; p < num_players; ++p) player_scores(-1, p, "");
 
+    write_player(0, "Start");
+
     for (t = 0; t < 150*num_players; ++t)
     {
         const char *turn;
         p = t%num_players;
-        if (t == 0) write_player(p, "Start");
         player_looks(p);
-        turn = read_player(p);
-        player_scores(t/num_players, p, turn);
+        if ((turn = read_player(p)) == NULL)
+        {
+            printf("Unexpected end of input from player %d!\n", p + 1);
+            break;
+        }
         /*
         mm_print(&mm_player[p], stdout, true);
         printf("(%s)\n", mm_encode(&mm_player[p], true));
         */
         if (!player_moves(p, turn)) break;
-        if (num_players == 1 && map_complete[p]) break;
-        if (player_dist() == 0)
-        {
-            if (map_complete[p]) break;
-            ++score[p].captures;
-        }
+        player_scores(t/num_players, p, turn);
+        if (map_complete[p] && (num_players == 1 || player_dist() == 0)) break;
     }
     printf("------------------------------------------------\n");
 
     if (num_players == 1)
     {
-        printf("Score: %d\n", final_score(0));
+        printf("Score: %d\n", final_score(0, -1));
     }
     else  /* (num_players == 2) */
     {
-        if (t < 150*num_players)
-        {
-            /* won by sudden-death */
-            printf("Score: %d - %d\n", p == 0 ? 2*final_score(0) : 0,
-                                       p == 1 ? 2*final_score(1) : 0);
-        }
-        else
-        {
-            printf("Score: %d - %d\n", final_score(0), final_score(1)); 
-        }
+        if (t == 150*num_players) p = -1;  /* drawn */
+        printf("Score: %d - %d\n", final_score(0, p), final_score(1, p));
     }
     finalize();
     return 0;

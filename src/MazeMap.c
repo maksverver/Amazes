@@ -155,6 +155,7 @@ void mm_move(MazeMap *mm, char move)
     default: assert(0);   /* invalid char */
     }
     mm->dir = TURN(mm->dir, rel_dir);
+    push_border(mm, mm->loc.r, mm->loc.c, mm->dir);
     mm->loc.r = RDR(mm->loc.r, mm->dir);
     mm->loc.c = CDC(mm->loc.c, mm->dir);
     SET_SQUARE(mm, mm->loc.r, mm->loc.c, PRESENT);
