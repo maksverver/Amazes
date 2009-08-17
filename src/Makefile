@@ -1,12 +1,12 @@
 CFLAGS=-Wall -Wextra -O0 -g -ansi
 LDFLAGS=-lm -g
 
-SUBMISSION_SRC=MazeMap.c MazeIO.c player.c
+SUBMISSION_SRC=MazeMap.c MazeIO.c Analysis.c player.c
 
 OBJS=MazeMap.o MazeIO.o
-PLAYER_OBJS=player.o $(OBJS)
-CONVERT_OBJS=convert.o $(OBJS)
-ARBITER_OBJS=arbiter.o $(OBJS)
+PLAYER_OBJS=$(OBJS) Analysis.o player.o
+CONVERT_OBJS=$(OBJS) convert.o
+ARBITER_OBJS=$(OBJS) arbiter.o
 
 TARGETS=player convert arbiter submission.c
 
