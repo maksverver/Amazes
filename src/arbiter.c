@@ -431,8 +431,7 @@ static void initialize(int argc, char *argv[])
     do {
         for (p = 0; p < num_players; ++p)
             place_player(&mm_player[p]);
-        printf("placing... %d\n", player_dist());
-    } while (player_dist() < 17*17);
+    } while (num_players > 1 && player_dist() < 17*17);
 
     /* Start player programs: */
     disable_sigpipe();
