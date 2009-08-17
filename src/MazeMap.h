@@ -48,7 +48,6 @@ typedef struct MazeMap
     Point       loc;
     Dir         dir;
     Rect        border;
-    bool        bound_ns, bound_ew;
 } MazeMap;
 
 extern int dir_dr[4], dir_dc[4];

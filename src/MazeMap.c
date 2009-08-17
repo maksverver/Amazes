@@ -216,6 +216,9 @@ static bool mark_dead_end(MazeMap *mm, bool dead_end[HEIGHT][WIDTH],
 void mm_infer(MazeMap *mm)
 {
     bool changed;
+    int  r, c;
+    bool dead_end[HEIGHT][WIDTH];
+
     do {
         changed = false;
 
@@ -237,17 +240,13 @@ void mm_infer(MazeMap *mm)
            also discovered. This square is also called a 'dead-end'-square. All
            four openings for this square are discovered.
         */
+        memset(dead_end, 0, sizeof(dead_end));
+        for (r = 0; r < HEIGHT; ++r)
         {
-            bool dead_end[HEIGHT][WIDTH];
-            int  r, c;
-            memset(dead_end, 0, sizeof(dead_end));
-            for (r = 0; r < HEIGHT; ++r)
+            for (c = 0; c < WIDTH; ++c)
             {
-                for (c = 0; c < WIDTH; ++c)
-                {
-                    if (mark_dead_end(mm, dead_end, r, c))
-                        changed = true;
-                }
+                if (mark_dead_end(mm, dead_end, r, c))
+                    changed = true;
             }
         }
 
@@ -255,50 +254,47 @@ void mm_infer(MazeMap *mm)
 
         /* If for a corner in the maze you have discovered that three edges are
            openings, the fourth edge has to be a wall and is discovered. */
+        for (r = 0; r < HEIGHT; ++r)
         {
-            int r0, c0;
-            for (r0 = 0; r0 < HEIGHT; ++r0)
+            for (c = 0; c < WIDTH; ++c)
             {
-                for (c0 = 0; c0 < WIDTH; ++c0)
+                const int r1 = (r + 1)%HEIGHT;
+                const int c1 = (c + 1)%WIDTH;
+                int n, e, s, w, na;
+                n = mm->grid[r ][c1].wall_w;
+                e = mm->grid[r1][c1].wall_n;
+                s = mm->grid[r1][c1].wall_w;
+                w = mm->grid[r1][c ].wall_n;
+                na = 0;
+                if (n == ABSENT) ++na;
+                if (e == ABSENT) ++na;
+                if (s == ABSENT) ++na;
+                if (w == ABSENT) ++na;
+                assert(na <= 3);
+                if (na == 3)
                 {
-                    const int r1 = (r0 + 1)%HEIGHT;
-                    const int c1 = (c0 + 1)%WIDTH;
-                    int n, e, s, w, na;
-                    n = mm->grid[r0][c1].wall_w;
-                    e = mm->grid[r1][c1].wall_n;
-                    s = mm->grid[r1][c1].wall_w;
-                    w = mm->grid[r1][c0].wall_n;
-                    na = 0;
-                    if (n == ABSENT) ++na;
-                    if (e == ABSENT) ++na;
-                    if (s == ABSENT) ++na;
-                    if (w == ABSENT) ++na;
-                    assert(na <= 3);
-                    if (na == 3)
+                    if (n == UNKNOWN)
                     {
-                        if (n == UNKNOWN)
-                        {
-                            mm->grid[r0][c1].wall_w = PRESENT;
-                            changed = true;
-                        }
-                        else
-                        if (e == UNKNOWN)
-                        {
-                            mm->grid[r1][c1].wall_n = PRESENT;
-                            changed = true;
-                        }
-                        else
-                        if (s == UNKNOWN)
-                        {
-                            mm->grid[r1][c1].wall_w = PRESENT;
-                            changed = true;
-                        }
-                        else
-                        if (w == UNKNOWN)
-                        {
-                            mm->grid[r1][c0].wall_n = PRESENT;
-                            changed = true;
-                        }
+                        mm->grid[r ][c1].wall_w = PRESENT;
+                        changed = true;
+                    }
+                    else
+                    if (e == UNKNOWN)
+                    {
+                        mm->grid[r1][c1].wall_n = PRESENT;
+                        changed = true;
+                    }
+                    else
+                    if (s == UNKNOWN)
+                    {
+                        mm->grid[r1][c1].wall_w = PRESENT;
+                        changed = true;
+                    }
+                    else
+                    if (w == UNKNOWN)
+                    {
+                        mm->grid[r1][c ].wall_n = PRESENT;
+                        changed = true;
                     }
                 }
             }
@@ -307,29 +303,33 @@ void mm_infer(MazeMap *mm)
         /* If you have discovered, or know of open connections to, at least one
            square in all 25 columns of the maze, the vertical walls on the
            outside (the outer edges of the maze) are discovered. */
-        if (!mm->bound_ew && mm->border.left == mm->border.right)
+        if (mm->border.left == mm->border.right)
         {
-            int r;
-            mm->bound_ew = true;
             for (r = 0; r < HEIGHT; ++r)
             {
-                mm->grid[r][mm->border.left].wall_w = true;
+                if (mm->grid[r][mm->border.left].wall_w != PRESENT)
+                {
+                    assert(mm->grid[r][mm->border.left].wall_w == UNKNOWN);
+                    mm->grid[r][mm->border.left].wall_w = PRESENT;
+                    changed = true;
+                }
             }
-            changed = true;
         }
 
         /* If you have discovered, or know of open connections to, at least one
            square in all 25 rows of the maze, the horizontal walls on the
            outside (the outer edges of the maze) are discovered. */
-        if (!mm->bound_ns && mm->border.top == mm->border.bottom)
+        if (mm->border.top == mm->border.bottom)
         {
-            int c;
-            mm->bound_ns = true;
             for (c = 0; c < WIDTH; ++c)
             {
-                mm->grid[mm->border.top][c].wall_n = true;
+                if (mm->grid[mm->border.top][c].wall_n != PRESENT)
+                {
+                    assert(mm->grid[mm->border.top][c].wall_n == UNKNOWN);
+                    mm->grid[mm->border.top][c].wall_n = PRESENT;
+                    changed = true;
+                }
             }
-            changed = true;
         }
 
         /* If the 25 walls of one outer edge of the maze have been discovered,
