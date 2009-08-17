@@ -5,7 +5,7 @@ player:
 - simple sudden-death mode
 - test official submission
 
-judge:
+arbiter:
 - LATER: support for manual play?
 
 MazeIO:

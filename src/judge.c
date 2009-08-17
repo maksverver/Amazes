@@ -409,7 +409,7 @@ static void initialize(int argc, char *argv[])
     {
         printf(
 "usage:\n"
-"\tjudge [options] <maze file> <player 1 command> [<player 2 command>]\n"
+"\tarbiter [options] <maze file> <player 1 command> [<player 2 command>]\n"
 "options:\n"
 "\t--csv <file>\n"
 "\t--seed <value>\n");
