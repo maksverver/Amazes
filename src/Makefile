@@ -19,10 +19,10 @@ arbiter:  	$(ARBITER_OBJS);  	$(CC) $(LDFLAGS) -o $@ $(ARBITER_OBJS)
 
 
 Manual.o: Manual.cpp
-	$(CXX) $(CFLAGS) `fltk-config --cflags` -o $@ -c $<
+	$(CXX) $(CFLAGS) -pthread `fltk-config --cflags` -o $@ -c $<
 
 manual: $(MANUAL_OBJS)
-	$(CC) $(LDFLAGS) `fltk-config --ldflags` -o $@ $(MANUAL_OBJS)
+	$(CC) $(LDFLAGS) -pthread `fltk-config --ldflags` -o $@ $(MANUAL_OBJS)
 
 submission.c: $(SUBMISSION_SRC)
 	../tools/compile.pl $(SUBMISSION_SRC) >$@

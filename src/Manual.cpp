@@ -4,48 +4,65 @@ extern "C"
 #include "Analysis.h"
 }
 
+#include <string>
+#include <cstdlib>
+#include <pthread.h>
 #include <FL/Fl.H>
-#include <FL/Fl_Window.H>
+#include <FL/Fl_Double_Window.H>
 #include <FL/fl_draw.H>
+
+class MazeWindow : public Fl_Double_Window
+{
+public:
+    MazeWindow(MazeMap *mm, int distsq);
+    ~MazeWindow();
+    int square(int r, int c);
+    int wall(int r, int c, Dir dir);
+    void draw();
+    int handle(int event);
+    void update(MazeMap *mm, int distsq);
+    std::string get_next_turn();
+
+private:
+    const MazeMap   *mm;
+    int             distsq;
+    int             m_dist[HEIGHT][WIDTH];
+    const char      *m_turn;
+    pthread_cond_t  cond;
+    pthread_mutex_t mutex;
+};
 
 const int SZ_SQ = 25;
 const int SZ_WA =  5;
 const int SZ_PL = 20;
 const int SZ_CE = SZ_SQ + SZ_WA;
 
-Fl_Color bg_color   = fl_rgb_color(0x60, 0x60, 0x60);
-Fl_Color sq_u_color = fl_rgb_color(0xF0, 0xF0, 0xF0);
-Fl_Color sq_p_color = fl_rgb_color(0x00, 0xFF, 0x00);
-Fl_Color wa_a_color = fl_rgb_color(0x00, 0xF0, 0x00);
-Fl_Color wa_u_color = fl_rgb_color(0xE0, 0xE0, 0xE0);
-Fl_Color wa_p_color = fl_rgb_color(0x00, 0x00, 0x00);
-Fl_Color pl_color   = fl_rgb_color(0xB0, 0x00, 0xB0);
-Fl_Color op_color   = fl_rgb_color(0x00, 0x00, 0xFF);
+static const Fl_Color bg_color   = fl_rgb_color(0x60, 0x60, 0x60);
+static const Fl_Color sq_u_color = fl_rgb_color(0xF0, 0xF0, 0xF0);
+static const Fl_Color sq_p_color = fl_rgb_color(0x00, 0xFF, 0x00);
+static const Fl_Color wa_a_color = fl_rgb_color(0x00, 0xF0, 0x00);
+static const Fl_Color wa_u_color = fl_rgb_color(0xE0, 0xE0, 0xE0);
+static const Fl_Color wa_p_color = fl_rgb_color(0x00, 0x00, 0x00);
+static const Fl_Color pl_color   = fl_rgb_color(0xB0, 0x00, 0xB0);
+static const Fl_Color op_color   = fl_rgb_color(0x00, 0x00, 0xFF);
 
-class MazeWindow : public Fl_Window
-{
-public:
-    MazeWindow(MazeMap *mm, int distsq);
-    int square(int r, int c);
-    int wall(int r, int c, Dir dir);
-    void draw();
-    int handle(int event);
-    const char *turn() { return m_turn; }
-
-private:
-    const MazeMap   * const mm;
-    const int       distsq;
-    int             m_dist[HEIGHT][WIDTH];
-    const char      *m_turn;
-};
+static MazeWindow   *g_maze_window;
+static pthread_t    g_gui_thread;
+static std::string  g_turn;
 
 MazeWindow::MazeWindow(MazeMap *mm, int distsq)
-    : Fl_Window(SZ_CE*mm_width(mm) + SZ_WA, SZ_CE*mm_height(mm) + SZ_WA,
-                "MazeMap"),
-      mm(mm), distsq(distsq)
+    : Fl_Double_Window(SZ_CE*mm_width(mm) + SZ_WA,
+                       SZ_CE*mm_height(mm) + SZ_WA, "MazeMap")
 {
-    find_distance(mm, m_dist, mm->loc.r, mm->loc.c);
-    m_turn = "T";
+    pthread_cond_init(&cond, NULL);
+    pthread_mutex_init(&mutex, NULL);
+    update(mm, distsq);
+}
+
+MazeWindow::~MazeWindow()
+{
+    pthread_cond_destroy(&cond);
+    pthread_mutex_destroy(&mutex);
 }
 
 int MazeWindow::square(int r, int c)
@@ -155,7 +172,7 @@ int MazeWindow::handle(int event)
             {
                 m_turn = construct_turn(mm, m_dist,
                                         mm->loc.r, mm->loc.c, mm->dir, r, c);
-                hide();
+                pthread_cond_broadcast(&cond);
             }
         }
         return 1;
@@ -165,13 +182,60 @@ int MazeWindow::handle(int event)
     }
 }
 
+void MazeWindow::update(MazeMap *mm, int distsq)
+{
+    Fl::lock();
+    this->mm     = mm;
+    this->distsq = distsq;
+    find_distance(mm, m_dist, mm->loc.r, mm->loc.c);
+    m_turn = "T";
+    resize(x(), y(), SZ_CE*mm_width(mm) + SZ_WA, SZ_CE*mm_height(mm) + SZ_WA);
+    redraw();
+    Fl::awake();
+    Fl::unlock();
+}
+
+std::string MazeWindow::get_next_turn()
+{
+    std::string res;
+    pthread_mutex_lock(&mutex);
+    pthread_cond_wait(&cond, &mutex);
+    res = m_turn;
+    pthread_mutex_unlock(&mutex);
+    return res;
+}
+
+static void *gui_thread_func(void *arg)
+{
+    (void)arg;  /* unused */
+    Fl::lock();
+    Fl::visual(FL_DOUBLE|FL_INDEX);
+    g_maze_window->show();
+    while (Fl::wait() > 0)
+    {
+        if (Fl::thread_message())
+        {
+            /* we don't handle any messages */
+        }
+    }
+    std::exit(0);
+    return NULL;
+}
 
 extern "C"
 const char *pick_move(MazeMap *mm, int distsq)
 {
-    MazeWindow win(mm, distsq);
-    win.end();
-    win.show();
-    Fl::run();
-    return win.turn();
+    if (g_maze_window == NULL)
+    {
+        g_maze_window = new MazeWindow(mm, distsq);
+        g_maze_window->end();
+        pthread_create(&g_gui_thread, NULL, &gui_thread_func, NULL);
+    }
+    else
+    {
+        g_maze_window->update(mm, distsq);
+    }
+
+    g_turn = g_maze_window->get_next_turn();
+    return g_turn.c_str();
 }
