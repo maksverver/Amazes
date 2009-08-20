@@ -35,16 +35,19 @@ void find_distance(const MazeMap *mm, int dist[HEIGHT][WIDTH], int r, int c)
 }
 
 const char *construct_turn(const MazeMap *mm, int dist[HEIGHT][WIDTH],
-                           int r1, int c1, int dir1, int r2, int c2)
+                           int r1, int c1, int dir1, int r2, int c2,
+                           Point path_out[HEIGHT*WIDTH], int *len_out)
 {
-    static char path_buf[HEIGHT*WIDTH];
+    static char turn_buf[HEIGHT*WIDTH];
+    static Point path_buf[HEIGHT*WIDTH];
 
-    Point loc[HEIGHT*WIDTH];
+    Point *loc = (path_out == NULL) ? path_buf : path_out;
     int pos, len, dir;
 
     /* Find path (r1,c1)==pos[0], pos[1], pos[2], .., pos[len]==(r2,c2) */
     loc[0].r = r1, loc[0].c = c1;
     len = dist[r2][c2];
+    if (len_out != NULL) *len_out = len;
     for (pos = len; pos > 0; --pos)
     {
         loc[pos].r = r2, loc[pos].c = c2;
@@ -80,8 +83,8 @@ const char *construct_turn(const MazeMap *mm, int dist[HEIGHT][WIDTH],
             }
         }
         assert(rel_dir < 4);
-        path_buf[pos] = "FRTL"[rel_dir];
+        turn_buf[pos] = "FRTL"[rel_dir];
     }
-    path_buf[pos] = '\0';
-    return path_buf;
+    turn_buf[pos] = '\0';
+    return turn_buf;
 }

@@ -83,5 +83,6 @@ const char *pick_move(MazeMap *mm, int distsq)
     if (dst.r == mm->loc.r && dst.c == mm->loc.c)
         return "T";
 
-    return construct_turn(mm, dist, mm->loc.r, mm->loc.c, mm->dir, dst.r, dst.c);
+    return construct_turn(mm, dist, mm->loc.r, mm->loc.c, mm->dir, dst.r, dst.c,
+                          NULL, NULL);
 }

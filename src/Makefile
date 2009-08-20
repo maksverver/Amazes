@@ -28,7 +28,7 @@ submission.c: $(SUBMISSION_SRC)
 	../tools/compile.pl $(SUBMISSION_SRC) >$@
 	
 clean:
-	rm -f $(PLAYER_OBJS) $(CONVERT_OBJS) $(ARBITER_OBJS)
+	rm -f *.o
 
 distclean: clean
 	rm -f $(TARGETS)

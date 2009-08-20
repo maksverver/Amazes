@@ -7,6 +7,7 @@ extern void find_distance( const MazeMap *mm, int dist[HEIGHT][WIDTH],
                            int r, int c);
 
 extern const char *construct_turn( const MazeMap *mm, int dist[HEIGHT][WIDTH],
-                                   int r1, int c1, int dir1, int r2, int c2);
+                                   int r1, int c1, int dir1, int r2, int c2,
+                                   Point path[HEIGHT*WIDTH], int *len);
 
 #endif /* ndef ANALYSIS_H_INCLUDED */

@@ -27,9 +27,12 @@ private:
     const MazeMap   *mm;
     int             distsq;
     int             m_dist[HEIGHT][WIDTH];
-    const char      *m_turn;
+    std::string     m_turn;
     pthread_cond_t  cond;
     pthread_mutex_t mutex;
+    int             m_last_r, m_last_c;
+    Point           m_path[HEIGHT*WIDTH];
+    int             m_path_len;
 };
 
 const int SZ_SQ = 25;
@@ -153,28 +156,61 @@ void MazeWindow::draw()
     fl_end_complex_polygon();
     fl_pop_matrix();
 
+    // Draw path
+    if (m_path_len > 0)
+    {
+        fl_font(FL_HELVETICA, SZ_PL);
+        fl_color(pl_color);
+        for (int n = 1; n <= m_path_len; ++n)
+        {
+            char buf[16];
+            extern int snprintf(char *str, size_t size, const char *fmt, ...);
+            snprintf(buf, sizeof(buf), "%d", n);
+            int r = (m_path[n].r - mm->border.top + HEIGHT)%HEIGHT;
+            int c = (m_path[n].c - mm->border.left + WIDTH)%WIDTH;
+            int x = c*SZ_CE + SZ_WA, y = r*SZ_CE;
+            int tw, th;
+            fl_measure(buf, tw, th);
+            x += (SZ_SQ - tw)/2;
+            y += (SZ_SQ + th)/2;
+            fl_draw(buf, x, y);
+        }
+    }
 }
 
 int MazeWindow::handle(int event)
 {
     switch (event)
     {
+    case FL_MOVE:
+        {
+            int x = Fl::event_x(), y = Fl::event_y(), r, c;
+            r = ((y - SZ_WA/2)/SZ_CE + HEIGHT + mm->border.top)%HEIGHT;
+            c = ((x - SZ_WA/2)/SZ_CE + WIDTH + mm->border.left)%WIDTH;
+            if (r != m_last_r || c != m_last_c)
+            {
+                m_last_r = r;
+                m_last_c = c;
+                if (m_dist[r][c] > 0)
+                {
+                    m_turn = construct_turn(mm, m_dist, mm->loc.r, mm->loc.c,
+                                            mm->dir, r, c, m_path, &m_path_len);
+                }
+                else
+                {
+                    m_path_len = 0;
+                    m_turn = "T";
+                }
+                redraw();
+            }
+        }
+        return 1;
+
     case FL_PUSH:
         return 1;
 
     case FL_RELEASE:
-        {
-            int x = Fl::event_x(), y = Fl::event_y();
-            if (x%SZ_CE < SZ_WA || y%SZ_CE < SZ_WA) return 1;
-            int r = (y/SZ_CE + mm->border.top)%HEIGHT,
-                c = (x/SZ_CE + mm->border.left)%WIDTH;
-            if (m_dist[r][c] > 0)
-            {
-                m_turn = construct_turn(mm, m_dist,
-                                        mm->loc.r, mm->loc.c, mm->dir, r, c);
-                pthread_cond_broadcast(&cond);
-            }
-        }
+        pthread_cond_broadcast(&cond);
         return 1;
 
     default:
@@ -185,10 +221,13 @@ int MazeWindow::handle(int event)
 void MazeWindow::update(MazeMap *mm, int distsq)
 {
     Fl::lock();
-    this->mm     = mm;
-    this->distsq = distsq;
+    this->mm            = mm;
+    this->distsq        = distsq;
+    this->m_last_r      = -1;
+    this->m_last_c      = -1;
+    this->m_path_len    = 0;
+    this->m_turn        = "T";
     find_distance(mm, m_dist, mm->loc.r, mm->loc.c);
-    m_turn = "T";
     resize(x(), y(), SZ_CE*mm_width(mm) + SZ_WA, SZ_CE*mm_height(mm) + SZ_WA);
     redraw();
     Fl::awake();
