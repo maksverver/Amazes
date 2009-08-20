@@ -440,8 +440,8 @@ static void open_csv(const char *path)
         printf("Couldn't open CSV file `%s'!\n", path);
         exit(EXIT_FAILURE);
     }
-    fprintf(fp_csv, "Turn,Player,Moves,Discovered,First,Captures,Score,"
-                    "Total,Moves,Map,Comments\n");
+    fprintf(fp_csv, "TurnNo,Player,Moves,Discovered,First,Captures,Score,"
+                    "Total,Turn,Map,Comments\n");
 }
 
 static void initialize(int argc, char *argv[])
