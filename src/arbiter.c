@@ -524,7 +524,11 @@ int main(int argc, char *argv[])
         new_score = player_scores(p, turn);
         log_progress(t/num_players, p, turn, &new_score, comments);
         score[p] = new_score;
-        if (map_complete[p] && (num_players == 1 || player_dist() == 0)) break;
+        if (map_complete[p] && (num_players == 1 || player_dist() == 0))
+        {
+            t++;
+            break;
+        }
     }
     printf("------------------------------------------------\n");
 
