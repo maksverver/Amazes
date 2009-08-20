@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <sys/wait.h>
 
 #define MAX_ARGS 50
@@ -41,7 +42,7 @@ static int num_players;
 static MazeMap mm_master, mm_player[2];
 static bool map_complete[2];
 static Score score[2];
-static FILE *fpr[2], *fpw[2], *fp_csv;
+static FILE *fpr[2], *fpw[2], *fpe[2], *fp_csv;
 static int pid[2];
 
 
@@ -99,10 +100,10 @@ static char * const *parse_args(char *command)
     return argv;
 }
 
-static void launch(char *command, FILE **fpr, FILE **fpw, int *pid)
+static void launch(char *command, FILE **fpr, FILE **fpw, FILE **fpe, int *pid)
 {
-    int fd[2][2];
-    if (pipe(fd[0]) != 0 || pipe(fd[1]) != 0)
+    int fd[3][2];
+    if (pipe(fd[0]) != 0 || pipe(fd[1]) != 0 || pipe(fd[2]) != 0)
     {
         fprintf(stderr, "launch(): couldn't create pipes!\n");
         exit(EXIT_FAILURE);
@@ -112,16 +113,18 @@ static void launch(char *command, FILE **fpr, FILE **fpw, int *pid)
         fprintf(stderr, "launch(): couldn't fork!\n");
         exit(EXIT_FAILURE);
     }
-
     if (*pid == 0)  /* in child */
     {
         char * const *argv = parse_args(command);
         dup2(fd[0][0], 0);
         dup2(fd[1][1], 1);
+        dup2(fd[2][1], 2);
         close(fd[0][0]);
         close(fd[0][1]);
         close(fd[1][0]);
         close(fd[1][1]);
+        close(fd[2][0]);
+        close(fd[2][1]);
         execv(argv[0], argv);
         /* print to stderr because original stdout was closed */
         fprintf(stderr, "Couldn't execute `%s'!\n", argv[0]);
@@ -131,9 +134,13 @@ static void launch(char *command, FILE **fpr, FILE **fpw, int *pid)
     {
         close(fd[0][0]);
         close(fd[1][1]);
-        *fpr = fdopen(fd[1][0], "rt");
-        *fpw = fdopen(fd[0][1], "wt");
-        if (*fpr == NULL || *fpw == NULL)
+        close(fd[2][1]);
+        /* Make reading from child's error stream non-blocking: */
+        fcntl(fd[2][0], F_SETFL, fcntl(fd[2][0], F_GETFL)|O_NONBLOCK);
+        *fpw = fdopen(fd[0][1], "wt");  /* stdin */
+        *fpr = fdopen(fd[1][0], "rt");  /* stdout */
+        *fpe = fdopen(fd[2][0], "rt");  /* stderr */
+        if (*fpr == NULL || *fpw == NULL || *fpe == NULL)
         {
             printf("launch(): couldn't fdopen pipes!");
             exit(EXIT_FAILURE);
@@ -172,6 +179,30 @@ static char *read_player(int p)
     while (eol > buf && isspace(*(eol - 1))) --eol;
     *eol = '\0';
     return buf;
+}
+
+char *read_comments(FILE *fp)
+{
+    char *p, *q;
+    static char comment_tmp[2048];
+    static char comment_buf[2*sizeof(comment_tmp) + 2];
+
+    /* Read a bunch of data from stderr */
+    comment_tmp[fread(comment_tmp, 1, sizeof(comment_tmp) - 1, fp)] = '\0';
+
+
+    /* Copy to comment_buf, while adding double-quote characters in front and
+       back and doubling all exitsing double-quote characters in comment_tmp. */
+    q = comment_buf;
+    *q++ = '"';
+    for (p = comment_tmp; *p != '\0' && (p[0] != '\n' || p[1] != '\0'); ++p)
+    {
+        if (*p == '"') *q++ = *p;
+        *q++ = *p;
+    }
+    *q++ = '"';
+    *q   = '\0';
+    return comment_buf;
 }
 
 /* Returns the squared Euclidian distance between two players */
@@ -294,11 +325,11 @@ static int total_score(const Score *sc)
     return -sc->moves + sc->sq_disc + sc->sq_disc_first + 100*sc->captures;
 }
 
-static void player_scores(int t, int player, const char *turn)
+static Score player_scores(int player, const char *turn)
 {
     int r, c;
     MazeMap *mm = &mm_player[player];
-    Score *sc = &score[player];
+    const Score *sc = &score[player];
     Score new_score = score[player];
 
     new_score.moves          = sc->moves + strlen(turn);
@@ -334,29 +365,34 @@ static void player_scores(int t, int player, const char *turn)
             ++new_score.captures;
     }
 
-    /* Print scores for this move: */
-    {
-        int moves        = new_score.moves - sc->moves;
-        int discovered   = new_score.sq_disc - sc->sq_disc;
-        int first        = new_score.sq_disc_first - sc->sq_disc_first;
-        int captures     = new_score.captures - sc->captures;
-        int total        = total_score(&new_score);
-        int score        = total - total_score(sc);
-
-        printf(" %5d %5d %5d %5d %5d %5d %5d %5d\n", t + 1, player + 1,
-               moves, discovered, first, captures, score, total );
-
-        if (fp_csv != NULL)
-        {
-            fprintf(fp_csv, "%d,%d,%d,%d,%d,%d,%d,%d", t + 1, player + 1,
-                            moves, discovered, first, captures, score, total);
-            fprintf(fp_csv, ",%s", mm_encode(mm, true));
-            fputc('\n', fp_csv);
-        }
-    }
-
-    *sc = new_score;
+    return new_score;
 }
+
+static void log_progress( int turn_no, int player,
+                          const char *turn, Score *new_score,
+                          const char *comments )
+{
+    const Score *old_score = &score[player];
+    const int moves      = new_score->moves - old_score->moves;
+    const int discovered = new_score->sq_disc - old_score->sq_disc;
+    const int first      = new_score->sq_disc_first - old_score->sq_disc_first;
+    const int captures   = new_score->captures - old_score->captures;
+    const int total      = total_score(new_score);
+    const int score      = total - total_score(old_score);
+    const char *map_desc = mm_encode(&mm_player[player], true);
+
+    printf(" %5d %5d %5d %5d %5d %5d %5d %5d\n", turn_no + 1, player + 1,
+            moves, discovered, first, captures, score, total );
+
+    if (fp_csv != NULL)
+    {
+        fprintf(fp_csv, "%d,%d,%d,%d,%d,%d,%d,%d,%s,%s,%s\n",
+                        turn_no + 1, player + 1,
+                        moves, discovered, first, captures, score, total,
+                        turn, map_desc, comments );
+    }
+}
+
 
 static int final_score(int player, int winner)
 {
@@ -405,7 +441,7 @@ static void open_csv(const char *path)
         exit(EXIT_FAILURE);
     }
     fprintf(fp_csv, "Turn,Player,Moves,Discovered,First,Captures,Score,"
-                    "Total,Map\n");
+                    "Total,Turn,Map,Comments\n");
 }
 
 static void initialize(int argc, char *argv[])
@@ -436,7 +472,7 @@ static void initialize(int argc, char *argv[])
     /* Start player programs: */
     disable_sigpipe();
     for (p = 0; p < num_players; ++p)
-        launch(argv[2 + p], &fpr[p], &fpw[p], &pid[p]);
+        launch(argv[2 + p], &fpr[p], &fpw[p], &fpe[p], &pid[p]);
 }
 
 static void finalize()
@@ -457,13 +493,21 @@ int main(int argc, char *argv[])
     printf("------------------------------------------------\n");
 
     /* Discover starting square */
-    for (p = 0; p < num_players; ++p) player_scores(-1, p, "");
+    for (p = 0; p < num_players; ++p)
+    {
+        Score new_score = player_scores(p, "");
+        log_progress(-1, p, "", &new_score, "");
+        score[p] = new_score;
+    }
 
     write_player(0, "Start");
 
     for (t = 0; t < 150*num_players; ++t)
     {
+        Score new_score;
         const char *turn;
+        const char *comments;
+
         p = t%num_players;
         player_looks(p);
         if ((turn = read_player(p)) == NULL)
@@ -476,19 +520,22 @@ int main(int argc, char *argv[])
         printf("(%s)\n", mm_encode(&mm_player[p], true));
         */
         if (!player_moves(p, turn)) break;
-        player_scores(t/num_players, p, turn);
+        comments = read_comments(fpe[p]);
+        new_score = player_scores(p, turn);
+        log_progress(t/num_players, p, turn, &new_score, comments);
+        score[p] = new_score;
         if (map_complete[p] && (num_players == 1 || player_dist() == 0)) break;
     }
     printf("------------------------------------------------\n");
 
     if (num_players == 1)
     {
-        printf("Score: %d\n", final_score(0, -1));
+        printf("Score: %d (after %d turns)\n", final_score(0, -1), t);
     }
     else  /* (num_players == 2) */
     {
         if (t == 150*num_players) p = -1;  /* drawn */
-        printf("Score: %d - %d\n", final_score(0, p), final_score(1, p));
+        printf("Score: %d - %d (after %d turns)\n", final_score(0, p), final_score(1, p), t);
     }
     finalize();
     return 0;
