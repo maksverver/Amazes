@@ -441,7 +441,7 @@ static void open_csv(const char *path)
         exit(EXIT_FAILURE);
     }
     fprintf(fp_csv, "Turn,Player,Moves,Discovered,First,Captures,Score,"
-                    "Total,Turn,Map,Comments\n");
+                    "Total,Moves,Map,Comments\n");
 }
 
 static void initialize(int argc, char *argv[])
