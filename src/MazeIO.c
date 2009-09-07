@@ -148,7 +148,6 @@ void mm_print(MazeMap *mm, FILE *fp, bool full)
             v = SQUARE(mm, r, c);
             if (r == mm->loc.r && c == mm->loc.c)
             {
-                assert(v == PRESENT);
                 switch (mm->dir)
                 {
                 case NORTH: fputc('^', fp); break;
@@ -171,6 +170,7 @@ void mm_print(MazeMap *mm, FILE *fp, bool full)
     }
 
     /* Line 2r */
+    r = (top + i)%HEIGHT;
     for (j = 0; j < w; ++j)
     {
         c = (left + j)%WIDTH;
